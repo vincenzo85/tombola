@@ -1,0 +1,22 @@
+# runtime / secrets
+certbot/
+letsencrypt/
+*.pem
+*.key
+*.crt
+*.csr
+
+# bundles / dumps
+tombola_bundle*.txt
+*.log
+
+# node/vite
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
