@@ -57,6 +57,7 @@ function makeSession({ hostName, settings }) {
       bnPerCard: Number(settings?.bnPerCard ?? 2),
       splits: settings?.splits ?? { ambo: 15, terno: 20, quaterna: 20, cinquina: 20, tombola: 25 }
     },
+    allowNewCards: settings?.allowNewCards ?? true,
     state: {
       started: false,
       ended: false,

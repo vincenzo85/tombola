@@ -106,6 +106,8 @@ function parseDrawnInput(text) {
 
 export default function Host({ socket, onToast }) {
   const [hostName, setHostName] = useState("Tomboliere");
+  const [newCardsAllowed, setNewCardsAllowed] = useState(true);
+
   const [code, setCode] = useState(null);
   const [session, setSession] = useState(null);
   const [hostView, setHostView] = useState(null);
@@ -119,7 +121,20 @@ export default function Host({ socket, onToast }) {
     cinquina: 20,
     tombola: 25,
   });
-
+const toggleNewCards = (allow) => {
+  const newStatus = allow !== undefined ? allow : !newCardsAllowed;
+  
+  socket.emit("host:toggleNewCards", { allowNewCards: newStatus }, (res) => {
+    if (!res?.ok) return onToast?.(res?.error || "Errore cambio stato cartelle");
+    
+    setNewCardsAllowed(res.allowNewCards);
+    onToast?.(
+      res.allowNewCards 
+        ? "✅ Nuove cartelle ora abilitate" 
+        : "⛔ Nuove cartelle ora disabilitate"
+    );
+  });
+};
   const [importText, setImportText] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [playerMessage, setPlayerMessage] = useState("");
@@ -149,7 +164,12 @@ export default function Host({ socket, onToast }) {
     socket.on("host:update", onHostUpdate);
     return () => socket.off("host:update", onHostView);
   }, [socket]);
-
+// Aggiungi questo useEffect:
+useEffect(() => {
+  if (session?.settings?.allowNewCards !== undefined) {
+    setNewCardsAllowed(session.settings.allowNewCards);
+  }
+}, [session?.settings?.allowNewCards]);
   const copyDrawnNumbers = () => {
     const drawnList = session?.state?.drawn ?? session?.drawn ?? [];
     const text = drawnList.join(", ");
@@ -333,6 +353,9 @@ export default function Host({ socket, onToast }) {
                 <span title="Info BN" style={{ cursor: "pointer", marginLeft: 6 }} onClick={() => setShowBNInfo(true)}>
                   🎅
                 </span>
+                <span className={"badge " + (newCardsAllowed ? "pill-green" : "pill-red")}>
+  {newCardsAllowed ? "✅ Cartelle abilitate" : "⛔ Cartelle disabilitate"}
+</span>
               </b>
             </span>
           </div>
@@ -344,6 +367,22 @@ export default function Host({ socket, onToast }) {
             <button className="btn" onClick={end}>
               Termina
             </button>
+              {/* NUOVO BOTTONE TOGGLE CARTELLE */}
+  <button 
+    className="btn" 
+    onClick={() => toggleNewCards()}
+    style={{
+      background: newCardsAllowed 
+        ? "rgba(34,197,94,0.2)" 
+        : "rgba(239,68,68,0.2)",
+      borderColor: newCardsAllowed 
+        ? "rgba(34,197,94,0.5)" 
+        : "rgba(239,68,68,0.5)",
+      color: newCardsAllowed ? "#22c55e" : "#ef4444"
+    }}
+  >
+    {newCardsAllowed ? "⛔ Disabilita Nuove Cartelle" : "✅ Abilita Nuove Cartelle"}
+  </button>
             <button className="btn" onClick={copyDrawnNumbers}>
               📋 Copia numeri estratti
             </button>

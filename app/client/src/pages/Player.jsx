@@ -6,6 +6,8 @@ import CartellaView from "../components/CartellaView.jsx";
 
 export default function Player({ socket, onToast }) {
   const [session, setSession] = useState(null);
+  const [cardsAllowed, setCardsAllowed] = useState(true);
+
   const [showBNInfo, setShowBNInfo] = useState(false);
   const [me, setMe] = useState(null);
   const [err, setErr] = useState(null);
@@ -48,7 +50,23 @@ export default function Player({ socket, onToast }) {
     // Salva lo stato dei popup in localStorage quando cambia
     localStorage.setItem('tombola_popupsEnabled', JSON.stringify(popupsEnabled));
   }, [popupsEnabled]);
+// Effetto per aggiornare dallo stato della sessione
+useEffect(() => {
+  if (session?.settings?.allowNewCards !== undefined) {
+    setCardsAllowed(session.settings.allowNewCards);
+  }
+}, [session?.settings?.allowNewCards]);
 
+// Listener per notifiche dal server
+useEffect(() => {
+  const onCardsStatusChanged = (data) => {
+    setCardsAllowed(data.allowed);
+    onToast?.(data.message);
+  };
+  
+  socket.on("cards:statusChanged", onCardsStatusChanged);
+  return () => socket.off("cards:statusChanged", onCardsStatusChanged);
+}, [socket, onToast]);
   const togglePopups = () => {
     setPopupsEnabled(prev => !prev);
     onToast?.(popupsEnabled ? "🔕 Popup disabilitati" : "🔔 Popup abilitati");
@@ -250,16 +268,57 @@ export default function Player({ socket, onToast }) {
           </div>
         </div>
 
-        <div className="col card">
-          <h3 style={{ marginTop: 0 }}>Inserisci cartella</h3>
-          <div className="small">Inserisci 3 righe da 5 numeri (1–90, senza duplicati).</div>
-          <div style={{ height: 8 }} />
-          <CardInput onSubmit={addCard} />
+      // Sostituisci la sezione "Inserisci cartella" con:
 
-          <button className="btn" style={{ marginTop: 10 }} onClick={addRandomCard}>
-            🎲 Aggiungi cartella casuale
-          </button>
-        </div>
+<div className="col card">
+  <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}>
+    Inserisci cartella
+    {!cardsAllowed && (
+      <span style={{ 
+        fontSize: "12px", 
+        padding: "3px 8px", 
+        background: "rgba(239,68,68,0.2)", 
+        borderRadius: "10px",
+        color: "#ef4444",
+        border: "1px solid rgba(239,68,68,0.3)"
+      }}>
+        ⛔ DISABILITATO
+      </span>
+    )}
+  </h3>
+  
+  {cardsAllowed ? (
+    <>
+      <div className="small">Inserisci 3 righe da 5 numeri (1–90, senza duplicati).</div>
+      <div style={{ height: 8 }} />
+      <CardInput onSubmit={addCard} />
+
+      <button className="btn" style={{ marginTop: 10 }} onClick={addRandomCard}>
+        🎲 Aggiungi cartella casuale
+      </button>
+    </>
+  ) : (
+    <div style={{ 
+      padding: "20px", 
+      textAlign: "center",
+      background: "rgba(239,68,68,0.1)",
+      borderRadius: "10px",
+      border: "1px solid rgba(239,68,68,0.3)",
+      marginTop: "10px"
+    }}>
+      <div style={{ fontSize: "32px", marginBottom: "10px" }}>⛔</div>
+      <div style={{ fontWeight: "bold", color: "#ef4444" }}>
+        Aggiunta cartelle disabilitata
+      </div>
+      <div className="small" style={{ marginTop: "8px" }}>
+        Il tomboliere ha temporaneamente disattivato l'aggiunta di nuove cartelle.
+      </div>
+      <div className="small" style={{ marginTop: "4px" }}>
+        Puoi comunque giocare con le cartelle già inserite.
+      </div>
+    </div>
+  )}
+</div>
       </div>
 
       <hr />

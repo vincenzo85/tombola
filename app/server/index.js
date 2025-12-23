@@ -251,6 +251,10 @@ io.on("connection", (socket) => {
       const session = sessions.get(meta.code);
       if (!session) return cb?.({ ok: false, error: "Sessione non trovata." });
 
+          if (!session.settings.allowNewCards) {
+      return cb?.({ ok: false, error: "⛔ L'host ha disabilitato l'aggiunta di nuove cartelle." });
+          }
+
       const player = session.players[meta.playerId];
       if (!player) return cb?.({ ok: false, error: "Giocatore non trovato." });
 
@@ -273,6 +277,36 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("host:toggleNewCards", (payload, cb) => {
+  try {
+    const meta = socketToSession.get(socket.id);
+    if (!meta || meta.role !== "host") return cb?.({ ok: false, error: "Non autorizzato." });
+
+    const session = sessions.get(meta.code);
+    if (!session) return cb?.({ ok: false, error: "Sessione non trovata." });
+
+    const allowNewCards = payload?.allowNewCards !== undefined 
+      ? Boolean(payload.allowNewCards)
+      : !session.settings.allowNewCards; // Toggle se non specificato
+
+    session.settings.allowNewCards = allowNewCards;
+
+    broadcastSession(meta.code);
+    
+    // Notifica tutti i giocatori del cambio stato
+    io.to(meta.code).emit("cards:statusChanged", { 
+      allowed: allowNewCards,
+      message: allowNewCards 
+        ? "✅ Il tomboliere ha riattivato l'aggiunta di nuove cartelle"
+        : "⛔ Il tomboliere ha disattivato l'aggiunta di nuove cartelle"
+    });
+
+    cb?.({ ok: true, allowNewCards });
+  } catch (e) {
+    cb?.({ ok: false, error: e.message });
+  }
+});
+
   // --- Player: add random card
   socket.on("player:addRandomCard", (_, cb) => {
     try {
@@ -281,6 +315,10 @@ io.on("connection", (socket) => {
 
       const session = sessions.get(meta.code);
       if (!session) return cb?.({ ok: false, error: "Sessione non trovata." });
+
+          if (!session.settings.allowNewCards) {
+      return cb?.({ ok: false, error: "⛔ L'host ha disabilitato l'aggiunta di nuove cartelle." });
+    }
 
       const player = session.players[meta.playerId];
       if (!player) return cb?.({ ok: false, error: "Giocatore non trovato." });

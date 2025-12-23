@@ -418,3 +418,68 @@ select.input {
     padding: 8px !important;
   }
 }
+
+/* Stili per lo stato cartelle */
+.cards-disabled-overlay {
+  position: relative;
+}
+
+.cards-disabled-overlay::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+.cards-disabled-message {
+  position: relative;
+  z-index: 2;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Animazione per il toggle */
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@keyframes pulse-glow-red {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.btn-toggle-active {
+  animation: pulse-glow 2s infinite;
+}
+
+.btn-toggle-inactive {
+  animation: pulse-glow-red 2s infinite;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .btn-toggle-text {
+    display: none;
+  }
+  
+  .btn-toggle-icon {
+    font-size: 18px;
+  }
+  
+  .btn[onclick*="toggleNewCards"]::after {
+    content: attr(data-short);
+  }
+  
+  .btn[onclick*="toggleNewCards"] span {
+    display: none;
+  }
+}
