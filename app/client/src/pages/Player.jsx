@@ -122,15 +122,20 @@ export default function Player({ socket, onToast }) {
   };
 
   const resetPlayerSession = () => {
-    try {
-      const code = localStorage.getItem("tombola_code");
-      socket.emit("session:leave", { code }, () => {});
-    } catch {}
-    localStorage.removeItem("tombola_code");
-    localStorage.removeItem("tombola_playerId");
-    window.location.hash = "/";
-    window.location.reload();
-  };
+  try {
+    const code = localStorage.getItem("tombola_code");
+    const playerId = localStorage.getItem("tombola_playerId");
+    
+    // Invia playerId esplicito
+    socket.emit("session:leave", { code, playerId }, () => {});
+  } catch {}
+  
+  localStorage.removeItem("tombola_code");
+  localStorage.removeItem("tombola_playerId");
+  localStorage.removeItem("tombola_name");
+  window.location.hash = "/";
+  window.location.reload();
+};
 
   const addCard = (numbers) => {
     socket.emit("player:addCard", { numbers }, (res) => {

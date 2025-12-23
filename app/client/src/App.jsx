@@ -63,7 +63,28 @@ export default function App() {
       socket.off("win:event", onWin);
     };
   }, [socket, popupsEnabled]);
+// App.jsx - Aggiungi questo effect
+useEffect(() => {
+  const handleBeforeUnload = (e) => {
+    // Controlla se siamo in una pagina con dati salvati
+    if (r === "/player" || r === "/host") {
+      const hasActiveSession = localStorage.getItem("tombola_code");
+      const hasPlayerCards = localStorage.getItem("tombola_playerId");
+      
+      if (hasActiveSession || hasPlayerCards) {
+        e.preventDefault();
+        e.returnValue = "Sei sicuro? Perderai tutti i dati della sessione corrente!";
+        return "Sei sicuro? Perderai tutti i dati della sessione corrente!";
+      }
+    }
+  };
 
+  window.addEventListener("beforeunload", handleBeforeUnload);
+  
+  return () => {
+    window.removeEventListener("beforeunload", handleBeforeUnload);
+  };
+}, [r]);
   const togglePopups = () => {
     setPopupsEnabled(prev => !prev);
     setToast(popupsEnabled ? "🔕 Popup disabilitati" : "🔔 Popup abilitati");
@@ -115,7 +136,12 @@ export default function App() {
                   </>
                 )}
               </button>
-              <div className="xmas-badge">✨ <b>Home</b> edition</div>
+   <div className="xmas-badge">
+              {r === "/host" && <span>✨ <b>Host</b></span>}
+              {r === "/player" && <span>🎮 <b>Player</b></span>}
+              {r === "/join" && <span>🔗 <b>Join</b></span>}
+              {!["/host", "/player", "/join"].includes(r) && <span>✨ <b>Home</b></span>}
+            </div>
             </div>
           </div>
 

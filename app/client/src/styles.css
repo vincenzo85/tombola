@@ -298,3 +298,123 @@ select.input {
   color: #ef4444;
   border: 1px solid rgba(239,68,68,0.3);
 }
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .xmas-badge {
+    font-size: 12px !important;
+    padding: 4px 8px !important;
+  }
+  
+  .btn {
+    padding: 10px 12px !important;
+    font-size: 14px !important;
+  }
+  
+  .xmas-title > div:first-child {
+    display: none; /* Nasconde l'emoji 🎄 su mobile molto piccolo */
+  }
+  
+  .container {
+    padding: 10px !important;
+  }
+  
+  .card {
+    padding: 12px !important;
+  }
+  
+  .row {
+    flex-direction: column !important;
+  }
+  
+  .col {
+    min-width: 100% !important;
+    margin-bottom: 12px !important;
+  }
+  
+  /* Header mobile */
+  .xmas-header {
+    flex-direction: column !important;
+    gap: 10px !important;
+    text-align: center !important;
+  }
+  
+  .xmas-title {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+  
+  /* Popup mobile */
+  .modal {
+    width: 95% !important;
+    margin: 10px !important;
+  }
+  
+  /* Credits links mobile */
+  .credits-links {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+  
+  /* Disabilita hover su mobile */
+  .btn:hover {
+    transform: none !important;
+  }
+}
+
+/* Tablet */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .container {
+    max-width: 100% !important;
+    padding: 12px !important;
+  }
+  
+  .col {
+    min-width: calc(50% - 12px) !important;
+  }
+}
+
+/* Small mobile - portrait */
+@media (max-width: 480px) {
+  h2, h3 {
+    font-size: 1.2rem !important;
+  }
+  
+  .xmas-badge {
+    font-size: 11px !important;
+    padding: 3px 6px !important;
+  }
+  
+  /* Riduci spaziatura */
+  .card {
+    padding: 10px !important;
+  }
+  
+  /* Input più grandi per touch */
+  .input {
+    padding: 14px 12px !important;
+    font-size: 16px !important; /* Previene zoom automatico */
+  }
+  
+  /* Bottone toggle popup più piccolo */
+  button[onclick^="togglePopups"] {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+  }
+}
+
+/* Gestione orientamento landscape mobile */
+@media (max-height: 600px) and (orientation: landscape) {
+  .xmas-header {
+    padding: 8px 12px !important;
+  }
+  
+  .container {
+    padding: 8px !important;
+  }
+  
+  /* Riduci altezza dei componenti per landscape */
+  .card {
+    padding: 8px !important;
+  }
+}

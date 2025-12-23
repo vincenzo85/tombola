@@ -16,6 +16,25 @@ const {
 const PORT = process.env.PORT || 8080;
 
 const app = express();
+// Aggiungi questa funzione dopo la dichiarazione delle variabili globali
+
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 ore dopo fine partita
+
+function cleanupOldSessions() {
+  const now = Date.now();
+  for (const [code, session] of sessions.entries()) {
+    if (session.state.ended) {
+      const endTime = new Date(session.state.endedAt || session.createdAt).getTime();
+      if (now - endTime > SESSION_TTL) {
+        console.log(`Cleaning up old session: ${code}`);
+        sessions.delete(code);
+      }
+    }
+  }
+}
+
+// Esegui cleanup ogni ora
+setInterval(cleanupOldSessions, 60 * 60 * 1000);
 app.use(express.json());
 
 // QR code as PNG (server-side)
@@ -43,8 +62,54 @@ app.get("*", (req, res) => {
 });
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, { 
+  cors: { 
+    origin: process.env.NODE_ENV === 'production' 
+      ? ["https://tombola.freeinfo.it"]
+      : ["http://localhost:8080", "http://localhost:5173"],
+    credentials: true
+  },
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minuti
+    skipMiddlewares: true
+  }
+});
+// Aggiungi rate limiting semplice
+const rateLimit = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minuto
+const MAX_EVENTS_PER_WINDOW = 30;
 
+io.use((socket, next) => {
+  const ip = socket.handshake.address;
+  const now = Date.now();
+  
+  if (!rateLimit.has(ip)) {
+    rateLimit.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+  } else {
+    const data = rateLimit.get(ip);
+    if (now > data.resetTime) {
+      data.count = 1;
+      data.resetTime = now + RATE_LIMIT_WINDOW;
+    } else {
+      data.count++;
+      if (data.count > MAX_EVENTS_PER_WINDOW) {
+        console.log(`Rate limit exceeded for IP: ${ip}`);
+        return next(new Error("Rate limit exceeded. Please slow down."));
+      }
+    }
+  }
+  
+  // Cleanup vecchi dati ogni ora
+  if (Math.random() < 0.01) { // 1% di probabilità ad ogni connessione
+    for (const [key, value] of rateLimit.entries()) {
+      if (now > value.resetTime + RATE_LIMIT_WINDOW * 10) {
+        rateLimit.delete(key);
+      }
+    }
+  }
+  
+  next();
+});
 const sessions = new Map(); // code -> session
 const socketToSession = new Map(); // socketId -> {code, role, playerId?}
 
@@ -283,11 +348,18 @@ io.on("connection", (socket) => {
 
   // --- Player: leave session (fix: players is object, not array)
   socket.on("session:leave", (payload, cb) => {
-    try {
-      const code = String(payload?.code || "").toUpperCase().trim();
-      const session = sessions.get(code);
-      if (!session) return cb?.({ ok: true });
+  try {
+    const code = String(payload?.code || "").toUpperCase().trim();
+    const playerId = payload?.playerId; // ORA LO RICEVI
+    
+    const session = sessions.get(code);
+    if (!session) return cb?.({ ok: true });
 
+    // METODO PRECISO: usa playerId se fornito
+    if (playerId && session.players[playerId]) {
+      delete session.players[playerId];
+    } else {
+      // FALLBACK: cerca per socketId (per backward compatibility)
       const entries = Object.entries(session.players);
       for (const [pid, p] of entries) {
         if (p?.socketId === socket.id) {
@@ -295,13 +367,14 @@ io.on("connection", (socket) => {
           break;
         }
       }
-
-      broadcastSession(code);
-      cb?.({ ok: true });
-    } catch (e) {
-      cb?.({ ok: true });
     }
-  });
+
+    broadcastSession(code);
+    cb?.({ ok: true });
+  } catch (e) {
+    cb?.({ ok: true }); // Silently fail
+  }
+});
 
   // --- Host: draw - MODIFICATO per inviare evento numero estratto
   socket.on("host:draw", (_, cb) => {
@@ -333,6 +406,7 @@ io.on("connection", (socket) => {
   });
 
   // --- Host: end
+  // Modifica la funzione host:end per salvare il timestamp
   socket.on("host:end", (_, cb) => {
     const meta = socketToSession.get(socket.id);
     if (!meta || meta.role !== "host") return cb?.({ ok: false, error: "Non autorizzato." });
@@ -341,10 +415,11 @@ io.on("connection", (socket) => {
     if (!session) return cb?.({ ok: false, error: "Sessione non trovata." });
 
     session.state.ended = true;
+    session.state.endedAt = nowIso(); // Salva quando è finita
+
     broadcastSession(meta.code);
     cb?.({ ok: true });
   });
-
   // --- Host: set drawn numbers from pasted text/array
   socket.on("host:setDrawn", (payload, cb) => {
     try {
