@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Board from "../components/Board.jsx";
 import LastNumbers from "../components/LastNumbers.jsx";
 import CardInput from "../components/CardInput.jsx";
@@ -11,6 +11,12 @@ export default function Player({ socket, onToast }) {
   const [err, setErr] = useState(null);
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [hostMessage, setHostMessage] = useState(null);
+  
+  // Stato per disabilitare i popup (caricato da localStorage)
+  const [popupsEnabled, setPopupsEnabled] = useState(() => {
+    const saved = localStorage.getItem('tombola_popupsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
 
   useEffect(() => {
     const onUpdate = (s) => setSession(s);
@@ -37,6 +43,16 @@ export default function Player({ socket, onToast }) {
     socket.on("player:message", onHostMessage);
     return () => socket.off("player:message", onHostMessage);
   }, [socket]);
+
+  useEffect(() => {
+    // Salva lo stato dei popup in localStorage quando cambia
+    localStorage.setItem('tombola_popupsEnabled', JSON.stringify(popupsEnabled));
+  }, [popupsEnabled]);
+
+  const togglePopups = () => {
+    setPopupsEnabled(prev => !prev);
+    onToast?.(popupsEnabled ? "🔕 Popup disabilitati" : "🔔 Popup abilitati");
+  };
 
   // Ascolta i numeri estratti per aggiornare in tempo reale
   useEffect(() => {
@@ -159,6 +175,18 @@ export default function Player({ socket, onToast }) {
 
         <button className="btn" type="button" onClick={copyDrawnNumbers}>
           📋 Copia numeri estratti
+        </button>
+        
+        <button 
+          className="btn" 
+          onClick={togglePopups}
+          style={{
+            background: popupsEnabled ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)",
+            borderColor: popupsEnabled ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)",
+            color: popupsEnabled ? "#22c55e" : "#ef4444"
+          }}
+        >
+          {popupsEnabled ? "🔔 Disabilita Popup" : "🔕 Abilita Popup"}
         </button>
 
         <span className="badge pill-gold">

@@ -81,6 +81,29 @@ function allocatePrizes(totalBN, splits) {
   return map;
 }
 
+// Funzione per analizzare l'input di testo e estrarre numeri validi
+function parseDrawnInput(text) {
+  const s = String(text || "").trim();
+  if (!s) return [];
+  
+  const nums = s
+    .split(/[^0-9]+/g)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((n) => Number(n))
+    .filter((n) => Number.isInteger(n) && n >= 1 && n <= 90);
+
+  const seen = new Set();
+  const out = [];
+  for (const n of nums) {
+    if (!seen.has(n)) {
+      seen.add(n);
+      out.push(n);
+    }
+  }
+  return out;
+}
+
 export default function Host({ socket, onToast }) {
   const [hostName, setHostName] = useState("Tomboliere");
   const [code, setCode] = useState(null);
@@ -101,6 +124,9 @@ export default function Host({ socket, onToast }) {
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [playerMessage, setPlayerMessage] = useState("");
   const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showImportConfirm, setShowImportConfirm] = useState(false);
+  const [parsedNumbers, setParsedNumbers] = useState([]);
+  const [importError, setImportError] = useState("");
 
   const joinUrl = useMemo(() => {
     const c = session?.code || code;
@@ -172,10 +198,37 @@ export default function Host({ socket, onToast }) {
 
   const end = () => socket.emit("host:end", {}, () => onToast?.("Sessione terminata."));
 
-  const importDrawn = () => {
-    socket.emit("host:setDrawn", { text: importText }, (res) => {
-      if (!res?.ok) return onToast?.(res?.error || "Errore import");
-      onToast?.("✅ Estratti aggiornati");
+  const handleImportClick = () => {
+    const numbers = parseDrawnInput(importText);
+    
+    if (numbers.length === 0) {
+      setImportError("Nessun numero valido trovato. Inserisci numeri da 1 a 90.");
+      return;
+    }
+
+    // Validazione aggiuntiva
+    const invalidNumbers = numbers.filter(n => n < 1 || n > 90);
+    if (invalidNumbers.length > 0) {
+      setImportError(`Numeri non validi: ${invalidNumbers.join(", ")}. I numeri devono essere tra 1 e 90.`);
+      return;
+    }
+
+    setParsedNumbers(numbers);
+    setImportError("");
+    setShowImportConfirm(true);
+  };
+
+  const confirmImport = () => {
+    socket.emit("host:setDrawn", { numbers: parsedNumbers }, (res) => {
+      if (!res?.ok) {
+        onToast?.(res?.error || "Errore import");
+        setShowImportConfirm(false);
+        return;
+      }
+      onToast?.("✅ Numeri estratti importati con successo!");
+      setImportText("");
+      setShowImportConfirm(false);
+      setImportError("");
     });
   };
 
@@ -193,6 +246,8 @@ export default function Host({ socket, onToast }) {
 
   const drawnList = session?.state?.drawn ?? session?.drawn ?? [];
   const last5 = session?.state?.last5 ?? session?.lastNumbers ?? drawnList.slice(-5);
+
+  const isImportDisabled = !importText.trim();
 
   return (
     <div className="card">
@@ -385,18 +440,47 @@ export default function Host({ socket, onToast }) {
             <div className="col card">
               <h3 style={{ marginTop: 0 }}>Riparti da un punto</h3>
               <div className="small">
-                Incolla i numeri estratti (es: <b>1,2,3,10,90</b> o con spazi).
+                Incolla i numeri estratti (es: <b>1,2,3,10,90</b> o con spazi). I numeri devono essere tra 1 e 90.
               </div>
               <textarea
                 className="input"
                 style={{ minHeight: 90, marginTop: 8 }}
                 value={importText}
-                onChange={(e) => setImportText(e.target.value)}
+                onChange={(e) => {
+                  setImportText(e.target.value);
+                  setImportError("");
+                }}
                 placeholder="Es: 5 12 33 45 90"
               />
-              <button className="btn btn-primary" style={{ marginTop: 10 }} onClick={importDrawn}>
-                ✅ Imposta estratti
+              
+              {importError && (
+                <div style={{ 
+                  marginTop: 8, 
+                  padding: "8px 12px", 
+                  background: "rgba(239,68,68,0.1)", 
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  borderRadius: "8px",
+                  color: "#ef4444",
+                  fontSize: "14px"
+                }}>
+                  ⚠️ {importError}
+                </div>
+              )}
+              
+              <button 
+                className="btn btn-primary" 
+                style={{ marginTop: 10 }} 
+                onClick={handleImportClick}
+                disabled={isImportDisabled}
+              >
+                {isImportDisabled ? "Inserisci numeri per importare" : "✅ Imposta estratti"}
               </button>
+              
+              {!isImportDisabled && (
+                <div className="small" style={{ marginTop: 8, color: "rgba(255,255,255,0.7)" }}>
+                  Verrà importato: {parseDrawnInput(importText).join(", ")}
+                </div>
+              )}
             </div>
 
             <div className="col card">
@@ -519,6 +603,64 @@ export default function Host({ socket, onToast }) {
               </button>
               <button className="btn" onClick={() => setShowMessageModal(false)}>
                 Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImportConfirm && (
+        <div className="modal-backdrop" onClick={() => setShowImportConfirm(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>⚠️ Conferma Importazione</h3>
+            <p>Stai per importare {parsedNumbers.length} numeri:</p>
+            <div style={{ 
+              background: "rgba(0,0,0,0.2)", 
+              padding: "12px", 
+              borderRadius: "8px",
+              margin: "12px 0",
+              maxHeight: "200px",
+              overflowY: "auto"
+            }}>
+              <b>{parsedNumbers.join(", ")}</b>
+            </div>
+            
+            <div style={{ 
+              background: "rgba(239,68,68,0.1)", 
+              padding: "12px", 
+              borderRadius: "8px",
+              border: "1px solid rgba(239,68,68,0.3)",
+              margin: "12px 0"
+            }}>
+              <h4 style={{ color: "#ef4444", marginTop: 0 }}>⚠️ ATTENZIONE!</h4>
+              <p className="small" style={{ color: "#ef4444" }}>
+                Questa operazione <b>cancellerà tutti i dati attuali</b>:
+              </p>
+              <ul className="small" style={{ color: "#ef4444", paddingLeft: "20px", margin: "8px 0" }}>
+                <li>Tutti i numeri estratti attuali saranno sostituiti</li>
+                <li>Tutte le vincite registrate (ambo, terno, etc.) saranno cancellate</li>
+                <li>Tutte le cartelle torneranno allo stato "nessuna vincita"</li>
+                <li>Lo stato della partita verrà resettato</li>
+              </ul>
+              <p className="small" style={{ color: "#ef4444", fontWeight: "bold" }}>
+                Sei sicuro di voler continuare?
+              </p>
+            </div>
+            
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button 
+                className="btn" 
+                onClick={() => setShowImportConfirm(false)}
+                style={{ background: "rgba(255,255,255,0.1)" }}
+              >
+                ❌ Annulla
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={confirmImport}
+                style={{ background: "rgba(239,68,68,0.9)" }}
+              >
+                ✅ Conferma e Importa
               </button>
             </div>
           </div>

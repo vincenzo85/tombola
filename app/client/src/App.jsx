@@ -16,6 +16,12 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [numberDrawn, setNumberDrawn] = useState(null);
   const [winEvent, setWinEvent] = useState(null);
+  
+  // Stato per disabilitare i popup (caricato da localStorage)
+  const [popupsEnabled, setPopupsEnabled] = useState(() => {
+    const saved = localStorage.getItem('tombola_popupsEnabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
 
   useEffect(() => {
     const onHash = () => setR(route());
@@ -24,20 +30,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Salva lo stato dei popup in localStorage quando cambia
+    localStorage.setItem('tombola_popupsEnabled', JSON.stringify(popupsEnabled));
+  }, [popupsEnabled]);
+
+  useEffect(() => {
     const onNumberDrawn = (data) => {
-      setNumberDrawn(data.number);
-      setTimeout(() => setNumberDrawn(null), 3000); // Scompare dopo 3 secondi
+      if (popupsEnabled) {
+        setNumberDrawn(data.number);
+        setTimeout(() => setNumberDrawn(null), 3000);
+      }
     };
     
     const onWin = (ev) => {
       // Mostra popup solo per il PRIMO ambo/terno/quaterna/cinquina e per TUTTE le tombola
       const shouldShowPopup = ev.isFirst || ev.type === "tombola";
-      if (shouldShowPopup) {
+      if (shouldShowPopup && popupsEnabled) {
         setWinEvent(ev);
-        setTimeout(() => setWinEvent(null), 5000); // Scompare dopo 5 secondi
+        setTimeout(() => setWinEvent(null), 5000);
       }
       
-      // Toast per tutte le vincite
+      // Toast per tutte le vincite (sempre visibile)
       const winType = ev.type === "tombola" ? "TOMBOLA" : ev.type.toUpperCase();
       setToast(`🎉 ${ev.playerName} ha fatto ${winType} (cartella ${ev.cardId})`);
     };
@@ -49,7 +62,12 @@ export default function App() {
       socket.off("number:drawn", onNumberDrawn);
       socket.off("win:event", onWin);
     };
-  }, [socket]);
+  }, [socket, popupsEnabled]);
+
+  const togglePopups = () => {
+    setPopupsEnabled(prev => !prev);
+    setToast(popupsEnabled ? "🔕 Popup disabilitati" : "🔔 Popup abilitati");
+  };
 
   const Page = (() => {
     if (r === "/") return <Home />;
@@ -72,7 +90,33 @@ export default function App() {
                 <div className="small">Gioco casalingo • punti "Babbi Natali" • solo per divertirsi</div>
               </div>
             </div>
-            <div className="xmas-badge">✨ <b>Home</b> edition</div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button 
+                className="btn" 
+                onClick={togglePopups}
+                style={{
+                  background: popupsEnabled ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)",
+                  borderColor: popupsEnabled ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)",
+                  color: popupsEnabled ? "#22c55e" : "#ef4444",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                {popupsEnabled ? (
+                  <>
+                    <span style={{ fontSize: 16 }}>🔔</span>
+                    <span>Disabilita Popup</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 16 }}>🔕</span>
+                    <span>Abilita Popup</span>
+                  </>
+                )}
+              </button>
+              <div className="xmas-badge">✨ <b>Home</b> edition</div>
+            </div>
           </div>
 
           <div style={{ height: 14 }} />
@@ -81,11 +125,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* Popup numero estratto */}
-      {numberDrawn && <NumberDrawnPopup number={numberDrawn} onClose={() => setNumberDrawn(null)} />}
+      {/* Popup numero estratto - mostrato solo se popupsEnabled = true */}
+      {popupsEnabled && numberDrawn && (
+        <NumberDrawnPopup number={numberDrawn} onClose={() => setNumberDrawn(null)} />
+      )}
       
-      {/* Popup vincita (solo primo ambo/terno/quaterna/cinquina e tombola) */}
-      {winEvent && <WinCelebration event={winEvent} onClose={() => setWinEvent(null)} />}
+      {/* Popup vincita - mostrato solo se popupsEnabled = true */}
+      {popupsEnabled && winEvent && (
+        <WinCelebration event={winEvent} onClose={() => setWinEvent(null)} />
+      )}
     </>
   );
 }
