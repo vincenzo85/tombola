@@ -559,3 +559,55 @@ select.input {
 .confetti:nth-child(2n) { background: #ef4444; }
 .confetti:nth-child(3n) { background: #22c55e; }
 .confetti:nth-child(4n) { background: #3b82f6; }
+
+.tombola-cartella{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  padding:10px;
+  border-radius:12px;
+  background:rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.14);
+}
+
+.tombola-cartella__row{
+  display:grid;
+  grid-template-columns:repeat(9, 1fr);
+  gap:6px;
+}
+
+.tombola-cartella__cell{
+  height:44px;                 /* meglio di aspect-ratio se il container è “strano” */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:8px;
+  font-weight:800;
+  font-size:14px;
+  user-select:none;
+}
+
+.tombola-cartella__cell.is-number{
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.18);
+  color:#fff;
+}
+
+.tombola-cartella__cell.is-empty{
+  background:rgba(255,255,255,0.03);
+  border:1px dashed rgba(255,255,255,0.10);
+  color:transparent;
+}
+
+.tombola-cartella__cell.is-hit{
+  background:#ef4444;
+  border-color:#ef4444;
+  color:#fff;
+  box-shadow:0 0 10px rgba(239,68,68,0.5);
+}
+
+@media (max-width:480px){
+  .tombola-cartella__cell{ height:34px; font-size:12px; border-radius:6px; }
+  .tombola-cartella{ padding:8px; }
+  .tombola-cartella__row{ gap:4px; }
+}

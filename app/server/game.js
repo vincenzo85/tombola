@@ -126,13 +126,84 @@ function recomputeWins(session) {
   return newEvents;
 }
 
-function generateRandomCard() {
-  const nums = new Set();
-  while (nums.size < 15) {
-    nums.add(Math.floor(Math.random() * 90) + 1);
-  }
-  const arr = Array.from(nums).sort((a, b) => a - b);
-  return [arr.slice(0, 5), arr.slice(5, 10), arr.slice(10, 15)];
+function colIndexFor(n) {
+  if (n >= 1 && n <= 9) return 0;
+  if (n >= 10 && n <= 19) return 1;
+  if (n >= 20 && n <= 29) return 2;
+  if (n >= 30 && n <= 39) return 3;
+  if (n >= 40 && n <= 49) return 4;
+  if (n >= 50 && n <= 59) return 5;
+  if (n >= 60 && n <= 69) return 6;
+  if (n >= 70 && n <= 79) return 7;
+  return 8; // 80-90
 }
+
+function rangeForCol(col) {
+  if (col === 0) return [1, 9];
+  if (col === 8) return [80, 90];
+  return [col * 10, col * 10 + 9];
+}
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function generateRandomCard() {
+  // 1) quante celle per colonna (9 colonne): totale 15, min 1, max 3
+  const counts = Array(9).fill(1);
+  let remaining = 15 - 9; // 6 extra da distribuire
+
+  while (remaining > 0) {
+    const c = randInt(0, 8);
+    if (counts[c] < 3) {
+      counts[c]++;
+      remaining--;
+    }
+  }
+
+  // 2) estrai numeri unici per colonna
+  const used = new Set();
+  const cols = Array.from({ length: 9 }, () => []);
+
+  for (let c = 0; c < 9; c++) {
+    const [a, b] = rangeForCol(c);
+    while (cols[c].length < counts[c]) {
+      const n = randInt(a, b);
+      if (!used.has(n)) {
+        used.add(n);
+        cols[c].push(n);
+      }
+    }
+    cols[c].sort((x, y) => x - y);
+  }
+
+  // 3) distribuisci su 3 righe con max 5 numeri per riga
+  const rows = [[], [], []];
+  const rowCount = [0, 0, 0];
+
+  // distribuzione bilanciata: riempi sempre la riga più “vuota”
+  for (let c = 0; c < 9; c++) {
+    for (const n of cols[c]) {
+      const options = [0, 1, 2].filter(r => rowCount[r] < 5);
+      options.sort((r1, r2) => rowCount[r1] - rowCount[r2]);
+      const r = options[0];
+
+      rows[r].push(n);
+      rowCount[r]++;
+    }
+  }
+
+  // sicurezza: devono essere 5/5/5
+  if (rowCount.some(x => x !== 5)) {
+    // fallback semplice (rarissimo): rigenera
+    return generateRandomCard();
+  }
+
+  // opzionale: ordina ogni riga per colonna (così “visivamente” ha senso)
+  rows.forEach(row => row.sort((a, b) => colIndexFor(a) - colIndexFor(b) || a - b));
+
+  return rows;
+}
+
 
 module.exports = { makeSession, validateCard, calcBN, drawNumber, recomputeWins, generateRandomCard };
