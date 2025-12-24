@@ -21,6 +21,8 @@ L'app mostra e calcola in "Babbi Natali (BN)" - punti fittizi, **NON denaro**.
 Eventuali accordi tra amici avvengono **fuori dall'app**.
 
 ## Funzionalità avanzate
+- **Blocco Cartelle**: Toggle per abilitare/disabilitare l'aggiunta di nuove cartelle da parte dei giocatori (utile a partita iniziata).
+- **Smorfia Napoletana**: Ogni numero estratto mostra la frase tradizionale della tombola (es. 48: "Il morto che parla") con relativa emoji.
 
 ### Cartelle casuali
 I player possono aggiungere una cartella casuale (15 numeri unici 1-90, 3 righe da 5) con il bottone 🎲.

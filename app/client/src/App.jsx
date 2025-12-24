@@ -4,6 +4,7 @@ import Home from "./pages/Home.jsx";
 import Host from "./pages/Host.jsx";
 import Join from "./pages/Join.jsx";
 import Player from "./pages/Player.jsx";
+import { getFraseForNumber } from "./tombolaFrasi";
 
 function route() {
   const h = window.location.hash.replace("#", "");
@@ -165,6 +166,8 @@ useEffect(() => {
 }
 
 function NumberDrawnPopup({ number, onClose }) {
+  const fraseData = getFraseForNumber(number);
+  
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()} style={{ 
@@ -173,19 +176,56 @@ function NumberDrawnPopup({ number, onClose }) {
         border: "3px solid rgba(255,255,255,0.5)",
         animation: "pulse 1s infinite alternate"
       }}>
-        <div style={{ fontSize: 80, marginBottom: 20 }}>🎲</div>
-        <h2 style={{ color: "#fff", margin: 0, fontSize: 32 }}>NUMERO ESTRATTO</h2>
         <div style={{ 
-          fontSize: 120, 
+          display: "flex", 
+          justifyContent: "center", 
+          alignItems: "center", 
+          gap: "15px",
+          marginBottom: "10px" 
+        }}>
+          <div style={{ fontSize: 60 }}>{fraseData.emoji}</div>
+          <div style={{ fontSize: 60 }}>🎲</div>
+        </div>
+        
+        <h2 style={{ color: "#fff", margin: 0, fontSize: 28, textShadow: "0 0 10px rgba(0,0,0,0.5)" }}>
+          NUMERO ESTRATTO
+        </h2>
+        
+        <div style={{ 
+          fontSize: 100, 
           fontWeight: 900, 
-          margin: "30px 0",
+          margin: "15px 0",
           color: "#fff",
-          textShadow: "0 0 20px rgba(0,0,0,0.5)"
+          textShadow: "0 0 20px rgba(0,0,0,0.8)",
+          lineHeight: 1
         }}>
           {number}
         </div>
-        <div className="small" style={{ color: "#fff", fontSize: 16 }}>
-          Clicca per chiudere
+        
+        <div style={{ 
+          fontSize: 24, 
+          fontWeight: 700,
+          color: "#fff",
+          background: "rgba(0,0,0,0.3)",
+          padding: "12px 20px",
+          borderRadius: "50px",
+          margin: "15px 0",
+          border: "2px solid rgba(255,255,255,0.3)",
+          textShadow: "0 0 5px rgba(0,0,0,0.5)"
+        }}>
+          {fraseData.frase}
+        </div>
+        
+        <div className="small" style={{ 
+          color: "#fff", 
+          fontSize: 14,
+          background: "rgba(255,255,255,0.1)",
+          padding: "8px 12px",
+          borderRadius: "8px",
+          display: "inline-block",
+          marginTop: "10px"
+        }}>
+          Clicca per chiudere • {number < 10 ? "Primina!" : "Continua a giocare!"}
         </div>
       </div>
     </div>

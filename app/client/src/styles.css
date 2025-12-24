@@ -483,3 +483,79 @@ select.input {
     display: none;
   }
 }
+/* Animazioni per il popup */
+@keyframes numberGlow {
+  0% { text-shadow: 0 0 10px currentColor; }
+  50% { text-shadow: 0 0 30px currentColor, 0 0 40px currentColor; }
+  100% { text-shadow: 0 0 10px currentColor; }
+}
+
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(0.95); opacity: 0; }
+  50% { transform: translateY(-10px) scale(1); opacity: 1; }
+  100% { transform: translateY(0) scale(0.95); opacity: 0; }
+}
+
+.number-glow {
+  animation: numberGlow 2s infinite ease-in-out;
+}
+
+/* Stili per la frase tombola */
+.tombola-frase {
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  letter-spacing: 0.5px;
+  position: relative;
+  padding: 10px 20px;
+}
+
+.tombola-frase::before,
+.tombola-frase::after {
+  content: "»";
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.5em;
+  color: #f59e0b;
+}
+
+.tombola-frase::before {
+  left: 5px;
+}
+
+.tombola-frase::after {
+  right: 5px;
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .tombola-frase {
+    font-size: 18px !important;
+    padding: 8px 15px !important;
+  }
+  
+  .number-glow {
+    font-size: 80px !important;
+  }
+  
+  .modal {
+    width: 90% !important;
+    margin: 10px !important;
+  }
+}
+
+/* Effetto confetti per numeri speciali */
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #f59e0b;
+  border-radius: 50%;
+  opacity: 0;
+  animation: floatUp 3s ease-in-out;
+}
+
+.confetti:nth-child(2n) { background: #ef4444; }
+.confetti:nth-child(3n) { background: #22c55e; }
+.confetti:nth-child(4n) { background: #3b82f6; }
