@@ -5,6 +5,15 @@ import CartellaView from "../components/CartellaView.jsx";
 
 const ORDER = ["ambo", "terno", "quaterna", "cinquina", "tombola"];
 
+// Default percentages
+const DEFAULT_SPLITS = {
+  ambo: 15,
+  terno: 20,
+  quaterna: 20,
+  cinquina: 20,
+  tombola: 25,
+};
+
 function pct(n) {
   const x = Number(n);
   return Number.isFinite(x) ? x : 0;
@@ -14,20 +23,36 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
-function rebalanceSplits(splits, key, nextValue) {
+// Master function for percentage calculation (supports both normal and locked mode)
+function rebalanceSplitsLocked(splits, locks, key, nextValue) {
   const cur = { ...splits };
   cur[key] = clamp(pct(nextValue), 0, 100);
+
+  // Editable entries (not locked) excluding the one we're moving
+  const editable = ORDER.filter((k) => !locks?.[k]);
+
+  // If trying to move a locked slider, ignore
+  if (locks?.[key]) return cur;
 
   let sum = ORDER.reduce((a, k) => a + pct(cur[k]), 0);
   let diff = sum - 100;
 
+  // Sequence to distribute the difference (only on unlocked entries different from key)
   const startIdx = ORDER.indexOf(key);
-  const seq = [...ORDER.slice(startIdx + 1), ...ORDER.slice(0, startIdx)];
+  const seq = [...ORDER.slice(startIdx + 1), ...ORDER.slice(0, startIdx)]
+    .filter((k) => k !== key && !locks?.[k]);
+
+  // If everything else is locked (or no space), current entry is forced
+  if (seq.length === 0) {
+    const lockedSum = ORDER.reduce((a, k) => a + (locks?.[k] ? pct(cur[k]) : 0), 0);
+    cur[key] = clamp(100 - lockedSum, 0, 100);
+    return cur;
+  }
 
   if (diff > 0) {
+    // Take from others (not locked)
     let d = diff;
     for (const k of seq) {
-      if (k === key) continue;
       if (d <= 0) break;
       const take = Math.min(d, pct(cur[k]));
       cur[k] = pct(cur[k]) - take;
@@ -35,9 +60,9 @@ function rebalanceSplits(splits, key, nextValue) {
     }
     if (d > 0) cur[key] = clamp(pct(cur[key]) - d, 0, 100);
   } else if (diff < 0) {
+    // Add to others (not locked)
     let d = -diff;
     for (const k of seq) {
-      if (k === key) continue;
       if (d <= 0) break;
       const room = 100 - pct(cur[k]);
       const add = Math.min(d, room);
@@ -47,9 +72,18 @@ function rebalanceSplits(splits, key, nextValue) {
     if (d > 0) cur[key] = clamp(pct(cur[key]) + d, 0, 100);
   }
 
+  // Round
   for (const k of ORDER) cur[k] = Math.round(pct(cur[k]));
+
+  // Fix eventual rounding drift on an unlocked entry
   let drift = ORDER.reduce((a, k) => a + pct(cur[k]), 0) - 100;
-  if (drift !== 0) cur["tombola"] = clamp(pct(cur["tombola"]) - drift, 0, 100);
+  if (drift !== 0) {
+    // Find a key to discharge the drift (preferably tombola, if not locked)
+    const driftKey = !locks?.tombola ? "tombola" : editable.find((k) => k !== key) || key;
+    if (driftKey && !locks?.[driftKey]) {
+      cur[driftKey] = clamp(pct(cur[driftKey]) - drift, 0, 100);
+    }
+  }
 
   return cur;
 }
@@ -81,18 +115,15 @@ function allocatePrizes(totalBN, splits) {
   return map;
 }
 
-// Funzione per analizzare l'input di testo e estrarre numeri validi
 function parseDrawnInput(text) {
   const s = String(text || "").trim();
   if (!s) return [];
-  
   const nums = s
     .split(/[^0-9]+/g)
     .map((x) => x.trim())
     .filter(Boolean)
     .map((n) => Number(n))
     .filter((n) => Number.isInteger(n) && n >= 1 && n <= 90);
-
   const seen = new Set();
   const out = [];
   for (const n of nums) {
@@ -104,26 +135,27 @@ function parseDrawnInput(text) {
   return out;
 }
 
+// -----------------------------------------------------------------------------
+// MAIN COMPONENT
+// -----------------------------------------------------------------------------
 export default function Host({ socket, onToast }) {
+  // 1. Base State Definitions
   const [hostName, setHostName] = useState("Tomboliere");
-  
-  // MODIFICA QUI: Default false (disabilitato all'inizio)
   const [newCardsAllowed, setNewCardsAllowed] = useState(false);
-
   const [code, setCode] = useState(null);
   const [session, setSession] = useState(null);
   const [hostView, setHostView] = useState(null);
-
   const [showBNInfo, setShowBNInfo] = useState(false);
   const [bnPerCard, setBnPerCard] = useState(2);
-  const [splits, setSplits] = useState({
-    ambo: 15,
-    terno: 20,
-    quaterna: 20,
-    cinquina: 20,
-    tombola: 25,
+
+  // 2. Prize States (Initial and Live)
+  const [splits, setSplits] = useState(DEFAULT_SPLITS); 
+  const [liveSplits, setLiveSplits] = useState(DEFAULT_SPLITS);
+  const [locks, setLocks] = useState({
+    ambo: false, terno: false, quaterna: false, cinquina: false, tombola: false,
   });
 
+  // 3. UI States (Import, Messages)
   const [importText, setImportText] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [playerMessage, setPlayerMessage] = useState("");
@@ -132,31 +164,7 @@ export default function Host({ socket, onToast }) {
   const [parsedNumbers, setParsedNumbers] = useState([]);
   const [importError, setImportError] = useState("");
 
-  const toggleNewCards = (allow) => {
-    const newStatus = allow !== undefined ? allow : !newCardsAllowed;
-    
-    socket.emit("host:toggleNewCards", { allowNewCards: newStatus }, (res) => {
-      if (!res?.ok) return onToast?.(res?.error || "Errore cambio stato cartelle");
-      
-      setNewCardsAllowed(res.allowNewCards);
-      onToast?.(
-        res.allowNewCards 
-          ? "✅ Nuove cartelle ora abilitate" 
-          : "⛔ Nuove cartelle ora disabilitate"
-      );
-    });
-  };
-
-  const joinUrl = useMemo(() => {
-    const c = session?.code || code;
-    return c ? `${window.location.origin}/#/join?code=${c}` : "";
-  }, [session?.code, code]);
-
-  const qrImgSrc = useMemo(() => {
-    if (!joinUrl) return "";
-    return `/api/qr?text=${encodeURIComponent(joinUrl)}`;
-  }, [joinUrl]);
-
+  // --- SOCKET LISTENERS ---
   useEffect(() => {
     const onUpdate = (s) => setSession(s);
     socket.on("session:update", onUpdate);
@@ -166,46 +174,38 @@ export default function Host({ socket, onToast }) {
   useEffect(() => {
     const onHostUpdate = (s) => setHostView(s);
     socket.on("host:update", onHostUpdate);
-    return () => socket.off("host:update", onHostView);
+    return () => socket.off("host:update", onHostUpdate);
   }, [socket]);
 
-  // Sincronizza lo stato se arriva dal server (ma gestisce il default undefined come false)
+  // --- SERVER DATA SYNCHRONIZATION ---
   useEffect(() => {
     if (session?.settings?.allowNewCards !== undefined) {
       setNewCardsAllowed(session.settings.allowNewCards);
     }
-  }, [session?.settings?.allowNewCards]);
+    if (session?.settings?.splits) {
+      setLiveSplits(session.settings.splits);
+    }
+  }, [session?.settings]);
 
-  const copyDrawnNumbers = () => {
-    const drawnList = session?.state?.drawn ?? session?.drawn ?? [];
-    const text = drawnList.join(", ");
-    navigator.clipboard.writeText(text).then(() => {
-      onToast?.("✅ Numeri copiati negli appunti!");
+  // --- ACTIONS ---
+
+  // Save live prize changes to server
+  const saveSplitsToServer = (nextSplits) => {
+    socket.emit("host:updateSettings", { settings: { splits: nextSplits } }, (res) => {
+      if (!res?.ok) onToast?.(res?.error || "Errore salvataggio ripartizione");
     });
   };
 
-  const sendPlayerMessage = () => {
-    if (!selectedPlayer || !playerMessage.trim()) {
-      onToast?.("Seleziona un giocatore e scrivi un messaggio");
-      return;
-    }
-
-    socket.emit("host:sendMessage", { 
-      playerId: selectedPlayer,
-      message: playerMessage.trim()
-    }, (res) => {
-      if (res?.ok) {
-        onToast?.("✅ Messaggio inviato!");
-        setPlayerMessage("");
-        setShowMessageModal(false);
-      } else {
-        onToast?.(res?.error || "Errore invio messaggio");
-      }
+  const toggleNewCards = (allow) => {
+    const newStatus = allow !== undefined ? allow : !newCardsAllowed;
+    socket.emit("host:toggleNewCards", { allowNewCards: newStatus }, (res) => {
+      if (!res?.ok) return onToast?.(res?.error || "Errore cambio stato cartelle");
+      setNewCardsAllowed(res.allowNewCards);
+      onToast?.(res.allowNewCards ? "✅ Nuove cartelle ora abilitate" : "⛔ Nuove cartelle ora disabilitate");
     });
   };
 
   const create = () => {
-    // Invia allowNewCards: false alla creazione
     socket.emit("host:create", { 
       hostName, 
       settings: { bnPerCard, splits, allowNewCards: false } 
@@ -226,22 +226,37 @@ export default function Host({ socket, onToast }) {
     });
   };
 
-  const end = () => socket.emit("host:end", {}, () => onToast?.("Sessione terminata."));
+  const copyDrawnNumbers = () => {
+    const drawnList = session?.state?.drawn ?? session?.drawn ?? [];
+    navigator.clipboard.writeText(drawnList.join(", ")).then(() => {
+      onToast?.("✅ Numeri copiati negli appunti!");
+    });
+  };
+
+  const sendPlayerMessage = () => {
+    if (!selectedPlayer || !playerMessage.trim()) {
+      return onToast?.("Seleziona un giocatore e scrivi un messaggio");
+    }
+    socket.emit("host:sendMessage", { playerId: selectedPlayer, message: playerMessage.trim() }, (res) => {
+      if (res?.ok) {
+        onToast?.("✅ Messaggio inviato!");
+        setPlayerMessage("");
+        setShowMessageModal(false);
+      } else {
+        onToast?.(res?.error || "Errore invio messaggio");
+      }
+    });
+  };
 
   const handleImportClick = () => {
     const numbers = parseDrawnInput(importText);
-    
     if (numbers.length === 0) {
-      setImportError("Nessun numero valido trovato. Inserisci numeri da 1 a 90.");
-      return;
+      return setImportError("Nessun numero valido trovato. Inserisci numeri da 1 a 90.");
     }
-
     const invalidNumbers = numbers.filter(n => n < 1 || n > 90);
     if (invalidNumbers.length > 0) {
-      setImportError(`Numeri non validi: ${invalidNumbers.join(", ")}. I numeri devono essere tra 1 e 90.`);
-      return;
+      return setImportError(`Numeri non validi: ${invalidNumbers.join(", ")}. I numeri devono essere tra 1 e 90.`);
     }
-
     setParsedNumbers(numbers);
     setImportError("");
     setShowImportConfirm(true);
@@ -251,36 +266,44 @@ export default function Host({ socket, onToast }) {
     socket.emit("host:setDrawn", { numbers: parsedNumbers }, (res) => {
       if (!res?.ok) {
         onToast?.(res?.error || "Errore import");
-        setShowImportConfirm(false);
-        return;
+      } else {
+        onToast?.("✅ Numeri estratti importati con successo!");
+        setImportText("");
+        setImportError("");
       }
-      onToast?.("✅ Numeri estratti importati con successo!");
-      setImportText("");
       setShowImportConfirm(false);
-      setImportError("");
     });
   };
 
+  // --- UI CALCULATIONS ---
+  const joinUrl = useMemo(() => {
+    const c = session?.code || code;
+    return c ? `${window.location.origin}/#/join?code=${c}` : "";
+  }, [session?.code, code]);
+
+  const qrImgSrc = useMemo(() => {
+    return joinUrl ? `/api/qr?text=${encodeURIComponent(joinUrl)}` : "";
+  }, [joinUrl]);
+
   const totalCardsFromPlayers = (session?.players || []).reduce((a, p) => a + (p.cardsCount || 0), 0);
   const totalCards = session?.stats?.totalCards ?? totalCardsFromPlayers ?? 0;
-
   const bnEach = session?.settings?.bnPerCard ?? bnPerCard;
   const totalBN = session?.stats?.totalBN ?? totalCards * bnEach;
 
-  const effectiveSplits = session?.settings?.splits ?? splits;
-  const sumSplits = ORDER.reduce((a, k) => a + pct(effectiveSplits?.[k]), 0);
-
+  // Decide which splits to show and calculate
+  const effectiveSplits = code ? (session?.settings?.splits ?? liveSplits) : splits;
   const prizes = useMemo(() => allocatePrizes(totalBN, effectiveSplits), [totalBN, effectiveSplits]);
 
   const drawnList = session?.state?.drawn ?? session?.drawn ?? [];
   const last5 = session?.state?.last5 ?? session?.lastNumbers ?? drawnList.slice(-5);
-
   const isImportDisabled = !importText.trim();
 
+  // --- RENDER ---
   return (
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Tomboliere</h2>
 
+      {/* --- SESSION CREATION SCREEN --- */}
       {!code && (
         <>
           <div className="row">
@@ -290,127 +313,77 @@ export default function Host({ socket, onToast }) {
             </div>
 
             <div className="col">
-              <label className="small">
-                Gettoni per cartella (🎅 BN): <b>{bnPerCard}</b>
-              </label>
-              <input
-                className="input"
-                type="range"
-                min="0"
-                max="10"
-                step="0.5"
-                value={bnPerCard}
-                onChange={(e) => setBnPerCard(Number(e.target.value))}
-                style={{ width: "100%" }}
-              />
+              <label className="small">Gettoni per cartella (🎅 BN): <b>{bnPerCard}</b></label>
+              <input className="input" type="range" min="0" max="10" step="0.5" value={bnPerCard}
+                onChange={(e) => setBnPerCard(Number(e.target.value))} style={{ width: "100%" }} />
               <div className="small" style={{ marginTop: 6 }}>
-                <b>BN: {bnPerCard}</b>{" "}
-                <span title="Info BN" style={{ cursor: "pointer", marginLeft: 6 }} onClick={() => setShowBNInfo(true)}>
-                  🎅
+                <span title="Info BN" style={{ cursor: "pointer" }} onClick={() => setShowBNInfo(true)}>
+                  ℹ️ Cos'è BN?
                 </span>
               </div>
             </div>
 
             <div className="col card">
-              <div style={{ fontWeight: 800, marginBottom: 8 }}>Ripartizione premi (slider)</div>
-
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>Ripartizione premi (iniziale)</div>
               {ORDER.map((k) => (
                 <div key={k} style={{ marginBottom: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <div style={{ width: 110, textTransform: "capitalize" }}>{k}</div>
-                    <div className="small">
-                      <b>{splits[k]}%</b>
-                    </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <div style={{ textTransform: "capitalize" }}>{k}</div>
+                    <div className="small"><b>{splits[k]}%</b></div>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={splits[k]}
-                    onChange={(e) => setSplits((s) => rebalanceSplits(s, k, e.target.value))}
-                    style={{ width: "100%" }}
-                  />
+                  <input type="range" min="0" max="100" value={splits[k]}
+                    onChange={(e) => setSplits((s) => rebalanceSplitsLocked(s, {}, k, e.target.value))}
+                    style={{ width: "100%" }} />
                 </div>
               ))}
-
-              <div className="small">
-                Somma: <b>{ORDER.reduce((a, k) => a + pct(splits[k]), 0)}%</b> (sempre 100)
-              </div>
+              <div className="small">Somma: <b>{ORDER.reduce((a, k) => a + pct(splits[k]), 0)}%</b></div>
             </div>
           </div>
-
-          <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={create}>
-            Crea sessione
-          </button>
+          <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={create}>Crea sessione</button>
         </>
       )}
 
+      {/* --- LIVE GAME SCREEN --- */}
       {code && (
         <>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+            <span className="badge pill-gold">Codice: <b style={{marginLeft:6}}>{code}</b></span>
+            <span className="badge pill-gold">Cartelle: <b style={{marginLeft:6}}>{totalCards}</b></span>
             <span className="badge pill-gold">
-              Codice sessione: <b style={{ marginLeft: 8 }}>{code}</b>
+              Montepremi: <b style={{marginLeft:6}}>{Math.floor(totalBN)} BN</b>
+              <span 
+                title="Info BN" 
+                style={{ cursor: "pointer", marginLeft: 6 }} 
+                onClick={() => setShowBNInfo(true)}
+              >
+                ℹ️
+              </span>
             </span>
-            <span className="badge pill-gold">
-              Cartelle totali: <b style={{ marginLeft: 8 }}>{totalCards}</b>
-            </span>
-            <span className="badge pill-gold">
-              Totale punti:{" "}
-              <b style={{ marginLeft: 8 }}>
-                {totalBN} BN{" "}
-                <span title="Info BN" style={{ cursor: "pointer", marginLeft: 6 }} onClick={() => setShowBNInfo(true)}>
-                  🎅
-                </span>
-                <span className={"badge " + (newCardsAllowed ? "pill-green" : "pill-red")}>
-                  {newCardsAllowed ? "✅ Cartelle APERTE" : "⛔ Cartelle CHIUSE"}
-                </span>
-              </b>
+            <span className={"badge " + (newCardsAllowed ? "pill-green" : "pill-red")}>
+              {newCardsAllowed ? "ISCRIZIONI APERTE" : "ISCRIZIONI CHIUSE"}
             </span>
           </div>
 
           <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-            <button className="btn btn-primary" onClick={draw} disabled={session?.ended}>
-              Estrai numero
+            <button className="btn btn-primary" onClick={draw} disabled={session?.ended}>Estrai numero</button>
+            <button className="btn" onClick={() => toggleNewCards()} style={{
+                background: newCardsAllowed ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.2)",
+                color: newCardsAllowed ? "#ef4444" : "#22c55e",
+                borderColor: newCardsAllowed ? "#ef4444" : "#22c55e"
+              }}>
+              {newCardsAllowed ? "⛔ Chiudi Iscrizioni" : "✅ Apri Iscrizioni"}
             </button>
-        
-            {/* LOGICA BOTTONE INVERTITA */}
-            <button 
-              className="btn" 
-              onClick={() => toggleNewCards()}
-              style={{
-                background: newCardsAllowed 
-                  ? "rgba(239,68,68,0.2)" // Se aperte, mostriamo rosso per chiudere
-                  : "rgba(34,197,94,0.2)", // Se chiuse, mostriamo verde per aprire
-                borderColor: newCardsAllowed 
-                  ? "rgba(239,68,68,0.5)" 
-                  : "rgba(34,197,94,0.5)",
-                color: newCardsAllowed ? "#ef4444" : "#22c55e"
-              }}
-            >
-              {newCardsAllowed ? "⛔ Chiudi iscrizioni Cartelle" : "✅ Apri iscrizioni Cartelle"}
-            </button>
-
-            <button className="btn" onClick={copyDrawnNumbers}>
-              📋 Copia numeri estratti
-            </button>
-            <button className="btn" onClick={() => setShowMessageModal(true)}>
-              💬 Invia messaggio a giocatore
-            </button>
+            <button className="btn" onClick={copyDrawnNumbers}>📋 Copia Estratti</button>
+            <button className="btn" onClick={() => setShowMessageModal(true)}>💬 Invia Messaggio</button>
           </div>
 
           <div className="row" style={{ marginTop: 12 }}>
             <div className="col card">
               <h3 style={{ marginTop: 0 }}>Estrazione</h3>
-              <div style={{ marginTop: 12 }}>
-                <LastNumbers numbers={last5 || []} />
-              </div>
-
-              <div style={{ marginTop: 12 }}>
-                <Board drawn={drawnList || []} />
-              </div>
-
+              <div style={{ marginTop: 12 }}><LastNumbers numbers={last5 || []} /></div>
+              <div style={{ marginTop: 12 }}><Board drawn={drawnList || []} /></div>
               <div style={{ marginTop: 12 }} className="card">
-                <h3 style={{ marginTop: 0 }}>Ordine estrazione</h3>
+                <h4 style={{ marginTop: 0 }}>Ordine estrazione</h4>
                 {drawnList?.length ? (
                   <>
                     <div className="small" style={{ opacity: 0.9, marginBottom: 8 }}>
@@ -432,73 +405,68 @@ export default function Host({ socket, onToast }) {
             </div>
 
             <div className="col card">
-              <h3 style={{ marginTop: 0 }}>Entra con QR</h3>
+              <h3 style={{ marginTop: 0 }}>QR Code</h3>
               <div className="small">Scansiona con la fotocamera</div>
-              <div style={{ display: "flex", justifyContent: "center", padding: 12 }}>
-                <div style={{ background: "white", padding: 10, borderRadius: 12 }}>
-                  {qrImgSrc ? (
-                    <img src={qrImgSrc} alt="QR" style={{ width: 220, height: 220, display: "block" }} />
-                  ) : (
-                    <div className="small">QR non disponibile</div>
-                  )}
-                </div>
+              <div style={{ background: "white", padding: 10, borderRadius: 12, margin: "10px auto", width: "fit-content" }}>
+                {qrImgSrc && <img src={qrImgSrc} alt="QR" style={{ width: 180, height: 180 }} />}
               </div>
-              <div className="small" style={{ textAlign: "center" }}>
-                Oppure codice: <b>{session?.code}</b>
-              </div>
+              <div className="small" style={{textAlign: "center"}}>Codice: <b>{session?.code}</b></div>
               <hr />
-              <div className="small">Link:</div>
-              <div className="small" style={{ wordBreak: "break-all", opacity: 0.9 }}>
-                {joinUrl}
-              </div>
+              <div className="small" style={{ wordBreak: "break-all", opacity: 0.9 }}>{joinUrl}</div>
             </div>
 
+            {/* --- LIVE PRIZE MANAGEMENT (New Logic with Locks) --- */}
             <div className="col card">
-              <h3 style={{ marginTop: 0 }}>Calcolo premi</h3>
-              <div className="small">
-                Montepremi = <b>{totalCards}</b> cartelle × <b>{bnEach}</b> BN = <b>{Math.floor(totalBN)}</b> BN
-              </div>
-              <div className="small" style={{ marginTop: 6 }}>
-                Ripartizione: somma = <b>{sumSplits}%</b>
-              </div>
-
-              <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+              <h3 style={{ marginTop: 0 }}>Gestione Premi Live</h3>
+              <div className="small" style={{ marginBottom: 10 }}>Montepremi: <b>{Math.floor(totalBN)} BN</b></div>
+              
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 10 }}>
                 {ORDER.map((k) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                    <div style={{ textTransform: "capitalize" }}>
-                      {k} <span className="small">({pct(effectiveSplits?.[k]) || 0}%)</span>
+                  <div key={k} style={{ marginBottom: 12, opacity: locks[k] ? 0.6 : 1 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                        <div style={{ textTransform: "capitalize", width: 70 }}>{k}</div>
+                        <div style={{ fontWeight: "bold", color: "#f59e0b" }}>{prizes[k]} BN</div>
+                      </div>
+                      <label className="small" style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", userSelect: "none" }}>
+                        <input type="checkbox" checked={!!locks[k]} onChange={(e) => setLocks((l) => ({ ...l, [k]: e.target.checked }))} />
+                        🔒 Blocca
+                      </label>
                     </div>
-                    <div>
-                      <b>{prizes[k]} BN</b>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <input type="range" min="0" max="100" value={pct(effectiveSplits?.[k])} disabled={!!locks[k]}
+                        onChange={(e) => {
+                          const next = rebalanceSplitsLocked(effectiveSplits, locks, k, e.target.value);
+                          setLiveSplits(next);
+                          saveSplitsToServer(next);
+                        }} style={{ flex: 1 }} />
+                      <div className="small" style={{ width: 40, textAlign: "right" }}>{pct(effectiveSplits?.[k])}%</div>
                     </div>
                   </div>
                 ))}
-              </div>
-
-              <hr />
-              <div className="small">
-                Qui i BN sono <b>interi</b> e la somma dei premi è sempre uguale al montepremi.
+                <div className="small" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  Totale: {ORDER.reduce((a, k) => a + pct(effectiveSplits?.[k]), 0)}%
+                </div>
               </div>
             </div>
           </div>
 
           <div className="row" style={{ marginTop: 12 }}>
             <div className="col card">
-              <h3 style={{ marginTop: 0 }}>Riparti da un punto</h3>
+              <h3 style={{ marginTop: 0 }}>Importa Partita</h3>
               <div className="small">
-                Incolla i numeri estratti (es: <b>1,2,3,10,90</b> o con spazi). I numeri devono essere tra 1 e 90.
+                Incolla i numeri estratti (es: <b>1,2,3,10,90</b> o con spazi). Numeri da 1 a 90.
               </div>
-              <textarea
-                className="input"
-                style={{ minHeight: 90, marginTop: 8 }}
-                value={importText}
+              <textarea 
+                className="input" 
+                style={{ minHeight: 80, marginTop: 8 }} 
+                value={importText} 
                 onChange={(e) => {
                   setImportText(e.target.value);
                   setImportError("");
-                }}
-                placeholder="Es: 5 12 33 45 90"
+                }} 
+                placeholder="Es: 5 12 33 45 90" 
               />
-              
               {importError && (
                 <div style={{ 
                   marginTop: 8, 
@@ -512,16 +480,14 @@ export default function Host({ socket, onToast }) {
                   ⚠️ {importError}
                 </div>
               )}
-              
               <button 
                 className="btn btn-primary" 
                 style={{ marginTop: 10 }} 
-                onClick={handleImportClick}
+                onClick={handleImportClick} 
                 disabled={isImportDisabled}
               >
                 {isImportDisabled ? "Inserisci numeri per importare" : "✅ Imposta estratti"}
               </button>
-              
               {!isImportDisabled && (
                 <div className="small" style={{ marginTop: 8, color: "rgba(255,255,255,0.7)" }}>
                   Verrà importato: {parseDrawnInput(importText).join(", ")}
@@ -530,18 +496,13 @@ export default function Host({ socket, onToast }) {
             </div>
 
             <div className="col card">
-              <h3 style={{ marginTop: 0 }}>Giocatori & cartelle</h3>
-              <div className="small" style={{ opacity: 0.9, marginBottom: 8 }}>
-                Totale (da giocatori): <b>{totalCardsFromPlayers}</b>
-              </div>
+              <h3 style={{ marginTop: 0 }}>Giocatori ({totalCardsFromPlayers} cartelle)</h3>
               {session?.players?.length ? (
                 <div style={{ display: "grid", gap: 8 }}>
                   {session.players.map((p) => (
                     <div key={p.id} style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
                       <div>🎄 {p.name}</div>
-                      <div>
-                        <b>{p.cardsCount}</b>
-                      </div>
+                      <b>{p.cardsCount}</b>
                     </div>
                   ))}
                 </div>
@@ -553,21 +514,16 @@ export default function Host({ socket, onToast }) {
 
           <div className="row" style={{ marginTop: 12 }}>
             <div className="col card">
-              <h3 style={{ marginTop: 0 }}>Cartelle di tutti (solo tomboliere)</h3>
-
+              <h3 style={{ marginTop: 0 }}>Cartelle Live (Solo Host)</h3>
               {hostView?.playersFull?.length ? (
                 <div style={{ display: "grid", gap: 10 }}>
                   {hostView.playersFull.map((p) => (
                     <div key={p.id} className="card">
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <b>👤 {p.name}</b>
-                        <span className="small">
-                          Cartelle: <b>{p.cards?.length || 0}</b>
-                        </span>
+                        <span className="small">Cartelle: <b>{p.cards?.length || 0}</b></span>
                       </div>
-
                       <div style={{ height: 8 }} />
-
                       {p.cards?.length ? (
                         <div className="row">
                           {p.cards.map((c) => (
@@ -600,56 +556,19 @@ export default function Host({ socket, onToast }) {
         </>
       )}
 
-      {showBNInfo && (
-        <div className="modal-backdrop" onClick={() => setShowBNInfo(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>🎅 Babbi Natali (BN)</h3>
-            <p className="small">
-              In questa versione "Home" i <b>Babbi Natali (BN)</b> sono solo un'unità ludica per fare i conti tra
-              amici/famiglia. Non è un sistema di pagamento, non è moneta, non crea obblighi.
-            </p>
-            <button className="btn" onClick={() => setShowBNInfo(false)}>
-              Ok
-            </button>
-          </div>
-        </div>
-      )}
-
+      {/* --- MODALS --- */}
       {showMessageModal && (
         <div className="modal-backdrop" onClick={() => setShowMessageModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>💬 Invia messaggio a giocatore</h3>
-            <div style={{ marginBottom: 12 }}>
-              <label className="small">Seleziona giocatore:</label>
-              <select 
-                className="input"
-                value={selectedPlayer}
-                onChange={(e) => setSelectedPlayer(e.target.value)}
-                style={{ width: "100%" }}
-              >
-                <option value="">-- Seleziona giocatore --</option>
-                {hostView?.playersFull?.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              <label className="small">Messaggio:</label>
-              <textarea 
-                className="input"
-                value={playerMessage}
-                onChange={(e) => setPlayerMessage(e.target.value)}
-                placeholder="Scrivi il messaggio per ripartire o altre istruzioni..."
-                style={{ width: "100%", minHeight: 100 }}
-              />
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn btn-primary" onClick={sendPlayerMessage} disabled={!selectedPlayer || !playerMessage.trim()}>
-                Invia
-              </button>
-              <button className="btn" onClick={() => setShowMessageModal(false)}>
-                Annulla
-              </button>
+            <h3 style={{marginTop:0}}>💬 Invia Messaggio</h3>
+            <select className="input" value={selectedPlayer} onChange={(e) => setSelectedPlayer(e.target.value)} style={{ marginBottom: 10, width: "100%" }}>
+              <option value="">-- Seleziona --</option>
+              {hostView?.playersFull?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <textarea className="input" value={playerMessage} onChange={(e) => setPlayerMessage(e.target.value)} style={{ width: "100%", height: 80 }} placeholder="Messaggio..." />
+            <div style={{marginTop:10, display:"flex", gap:10}}>
+              <button className="btn btn-primary" onClick={sendPlayerMessage} disabled={!selectedPlayer || !playerMessage.trim()}>Invia</button>
+              <button className="btn" onClick={() => setShowMessageModal(false)}>Annulla</button>
             </div>
           </div>
         </div>
@@ -658,8 +577,8 @@ export default function Host({ socket, onToast }) {
       {showImportConfirm && (
         <div className="modal-backdrop" onClick={() => setShowImportConfirm(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ marginTop: 0 }}>⚠️ Conferma Importazione</h3>
-            <p>Stai per importare {parsedNumbers.length} numeri:</p>
+            <h3 style={{marginTop:0}}>⚠️ Conferma Importazione</h3>
+            <p>Stai per importare <b>{parsedNumbers.length}</b> numeri:</p>
             <div style={{ 
               background: "rgba(0,0,0,0.2)", 
               padding: "12px", 
@@ -694,21 +613,21 @@ export default function Host({ socket, onToast }) {
             </div>
             
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button 
-                className="btn" 
-                onClick={() => setShowImportConfirm(false)}
-                style={{ background: "rgba(255,255,255,0.1)" }}
-              >
-                ❌ Annulla
-              </button>
-              <button 
-                className="btn btn-primary" 
-                onClick={confirmImport}
-                style={{ background: "rgba(239,68,68,0.9)" }}
-              >
-                ✅ Conferma e Importa
-              </button>
+              <button className="btn" onClick={() => setShowImportConfirm(false)}>Annulla</button>
+              <button className="btn btn-primary" onClick={confirmImport} style={{background:"#ef4444", borderColor:"#ef4444"}}>Conferma Reset</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showBNInfo && (
+        <div className="modal-backdrop" onClick={() => setShowBNInfo(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ marginTop: 0 }}>🎅 Babbi Natali (BN)</h3>
+            <p className="small">
+              I <b>Babbi Natali (BN)</b> sono un'unità di punteggio virtuale per gestire i premi in modo ludico tra amici e famiglia [file:1]. Non rappresentano denaro reale, non creano obblighi di pagamento, e sono puramente un sistema di conteggio per il gioco.
+            </p>
+            <button className="btn" onClick={() => setShowBNInfo(false)}>Ok</button>
           </div>
         </div>
       )}

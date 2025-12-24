@@ -343,6 +343,27 @@ io.on("connection", (socket) => {
       cb?.({ ok: false, error: e.message });
     }
   });
+// Aggiungi questo nel file app/server/index.js
+socket.on("host:updateSettings", (payload, cb) => {
+  try {
+    const meta = socketToSession.get(socket.id);
+    if (!meta || meta.role !== "host") return cb?.({ ok: false, error: "Non autorizzato." });
+
+    const session = sessions.get(meta.code);
+    if (!session) return cb?.({ ok: false, error: "Sessione non trovata." });
+
+    // Aggiorna solo i settings passati
+    if (payload.settings) {
+      session.settings = { ...session.settings, ...payload.settings };
+    }
+
+    // Broadcast a tutti
+    broadcastSession(meta.code);
+    cb?.({ ok: true });
+  } catch (e) {
+    cb?.({ ok: false, error: e.message });
+  }
+});
 
   socket.on("player:getMe", (_, cb) => {
     const meta = socketToSession.get(socket.id);
