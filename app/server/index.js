@@ -119,7 +119,12 @@ function publicSessionView(session) {
     code: session.code,
     createdAt: session.createdAt,
     hostName: session.host.name,
-    settings: session.settings,
+    settings: {
+      bnPerCard: session.settings.bnPerCard,
+      splits: session.settings.splits,
+      // ECCO LA RIGA CHE MANCAVA:
+      allowNewCards: session.settings.allowNewCards 
+    },
     state: {
       started: session.state.started,
       ended: session.state.ended,

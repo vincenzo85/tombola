@@ -106,7 +106,9 @@ function parseDrawnInput(text) {
 
 export default function Host({ socket, onToast }) {
   const [hostName, setHostName] = useState("Tomboliere");
-  const [newCardsAllowed, setNewCardsAllowed] = useState(true);
+  
+  // MODIFICA QUI: Default false (disabilitato all'inizio)
+  const [newCardsAllowed, setNewCardsAllowed] = useState(false);
 
   const [code, setCode] = useState(null);
   const [session, setSession] = useState(null);
@@ -121,20 +123,7 @@ export default function Host({ socket, onToast }) {
     cinquina: 20,
     tombola: 25,
   });
-const toggleNewCards = (allow) => {
-  const newStatus = allow !== undefined ? allow : !newCardsAllowed;
-  
-  socket.emit("host:toggleNewCards", { allowNewCards: newStatus }, (res) => {
-    if (!res?.ok) return onToast?.(res?.error || "Errore cambio stato cartelle");
-    
-    setNewCardsAllowed(res.allowNewCards);
-    onToast?.(
-      res.allowNewCards 
-        ? "✅ Nuove cartelle ora abilitate" 
-        : "⛔ Nuove cartelle ora disabilitate"
-    );
-  });
-};
+
   const [importText, setImportText] = useState("");
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [playerMessage, setPlayerMessage] = useState("");
@@ -142,6 +131,21 @@ const toggleNewCards = (allow) => {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [parsedNumbers, setParsedNumbers] = useState([]);
   const [importError, setImportError] = useState("");
+
+  const toggleNewCards = (allow) => {
+    const newStatus = allow !== undefined ? allow : !newCardsAllowed;
+    
+    socket.emit("host:toggleNewCards", { allowNewCards: newStatus }, (res) => {
+      if (!res?.ok) return onToast?.(res?.error || "Errore cambio stato cartelle");
+      
+      setNewCardsAllowed(res.allowNewCards);
+      onToast?.(
+        res.allowNewCards 
+          ? "✅ Nuove cartelle ora abilitate" 
+          : "⛔ Nuove cartelle ora disabilitate"
+      );
+    });
+  };
 
   const joinUrl = useMemo(() => {
     const c = session?.code || code;
@@ -164,12 +168,14 @@ const toggleNewCards = (allow) => {
     socket.on("host:update", onHostUpdate);
     return () => socket.off("host:update", onHostView);
   }, [socket]);
-// Aggiungi questo useEffect:
-useEffect(() => {
-  if (session?.settings?.allowNewCards !== undefined) {
-    setNewCardsAllowed(session.settings.allowNewCards);
-  }
-}, [session?.settings?.allowNewCards]);
+
+  // Sincronizza lo stato se arriva dal server (ma gestisce il default undefined come false)
+  useEffect(() => {
+    if (session?.settings?.allowNewCards !== undefined) {
+      setNewCardsAllowed(session.settings.allowNewCards);
+    }
+  }, [session?.settings?.allowNewCards]);
+
   const copyDrawnNumbers = () => {
     const drawnList = session?.state?.drawn ?? session?.drawn ?? [];
     const text = drawnList.join(", ");
@@ -199,7 +205,11 @@ useEffect(() => {
   };
 
   const create = () => {
-    socket.emit("host:create", { hostName, settings: { bnPerCard, splits } }, (res) => {
+    // Invia allowNewCards: false alla creazione
+    socket.emit("host:create", { 
+      hostName, 
+      settings: { bnPerCard, splits, allowNewCards: false } 
+    }, (res) => {
       if (!res?.ok) return onToast?.(res?.error || "Errore creazione sessione");
       setCode(res.code);
       setSession(res.session);
@@ -226,7 +236,6 @@ useEffect(() => {
       return;
     }
 
-    // Validazione aggiuntiva
     const invalidNumbers = numbers.filter(n => n < 1 || n > 90);
     if (invalidNumbers.length > 0) {
       setImportError(`Numeri non validi: ${invalidNumbers.join(", ")}. I numeri devono essere tra 1 e 90.`);
@@ -252,7 +261,6 @@ useEffect(() => {
     });
   };
 
-  // Stats robust
   const totalCardsFromPlayers = (session?.players || []).reduce((a, p) => a + (p.cardsCount || 0), 0);
   const totalCards = session?.stats?.totalCards ?? totalCardsFromPlayers ?? 0;
 
@@ -354,8 +362,8 @@ useEffect(() => {
                   🎅
                 </span>
                 <span className={"badge " + (newCardsAllowed ? "pill-green" : "pill-red")}>
-  {newCardsAllowed ? "✅ Cartelle abilitate" : "⛔ Cartelle disabilitate"}
-</span>
+                  {newCardsAllowed ? "✅ Cartelle APERTE" : "⛔ Cartelle CHIUSE"}
+                </span>
               </b>
             </span>
           </div>
@@ -364,25 +372,24 @@ useEffect(() => {
             <button className="btn btn-primary" onClick={draw} disabled={session?.ended}>
               Estrai numero
             </button>
-            <button className="btn" onClick={end}>
-              Termina
+        
+            {/* LOGICA BOTTONE INVERTITA */}
+            <button 
+              className="btn" 
+              onClick={() => toggleNewCards()}
+              style={{
+                background: newCardsAllowed 
+                  ? "rgba(239,68,68,0.2)" // Se aperte, mostriamo rosso per chiudere
+                  : "rgba(34,197,94,0.2)", // Se chiuse, mostriamo verde per aprire
+                borderColor: newCardsAllowed 
+                  ? "rgba(239,68,68,0.5)" 
+                  : "rgba(34,197,94,0.5)",
+                color: newCardsAllowed ? "#ef4444" : "#22c55e"
+              }}
+            >
+              {newCardsAllowed ? "⛔ Chiudi iscrizioni Cartelle" : "✅ Apri iscrizioni Cartelle"}
             </button>
-              {/* NUOVO BOTTONE TOGGLE CARTELLE */}
-  <button 
-    className="btn" 
-    onClick={() => toggleNewCards()}
-    style={{
-      background: newCardsAllowed 
-        ? "rgba(34,197,94,0.2)" 
-        : "rgba(239,68,68,0.2)",
-      borderColor: newCardsAllowed 
-        ? "rgba(34,197,94,0.5)" 
-        : "rgba(239,68,68,0.5)",
-      color: newCardsAllowed ? "#22c55e" : "#ef4444"
-    }}
-  >
-    {newCardsAllowed ? "⛔ Disabilita Nuove Cartelle" : "✅ Abilita Nuove Cartelle"}
-  </button>
+
             <button className="btn" onClick={copyDrawnNumbers}>
               📋 Copia numeri estratti
             </button>
