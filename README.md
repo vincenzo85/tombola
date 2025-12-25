@@ -1,7 +1,11 @@
-# Tombola Online (Docker)
+# Tombola Online (Docker) 🎄
 
-## Avvio
-```bash
+Sistema completo per giocare a tombola online con gestione realtime, notifiche, e strumenti avanzati per il tomboliere.
+
+## 🚀 Avvio Rapido
+
+### Sviluppo locale
+```
 docker compose up --build
 ```
 
@@ -9,195 +13,324 @@ Apri: http://localhost:8080
 
 Da mobile (stessa rete): http://IP_DEL_PC:8080
 
-## Funzionalità principali
-
-1. **Tomboliere** crea una sessione e condivide il codice
-2. I **giocatori** entrano con codice + nickname
-3. Inserimento cartelle manuale (3 righe x 5 numeri)
-4. Spunta automatica e notifiche vincite realtime
-
-## Punti BN (Babbi Natali)
-L'app mostra e calcola in "Babbi Natali (BN)" - punti fittizi, **NON denaro**.  
-Eventuali accordi tra amici avvengono **fuori dall'app**.
-
-## Funzionalità avanzate
-- **Blocco Cartelle**: Toggle per abilitare/disabilitare l'aggiunta di nuove cartelle da parte dei giocatori (utile a partita iniziata).
-- **Smorfia Napoletana**: Ogni numero estratto mostra la frase tradizionale della tombola (es. 48: "Il morto che parla") con relativa emoji.
-
-### Cartelle casuali
-I player possono aggiungere una cartella casuale (15 numeri unici 1-90, 3 righe da 5) con il bottone 🎲.
-
-### Popup notifiche
-- **Ogni numero estratto**: popup centrale con animazione
-- **Primo ambo/terno/quaterna/cinquina**: popup con fuochi d'artificio
-- **Ogni tombola**: popup celebrativo
-- **Disabilita/Abilita popup**: toggle per spegnere i popup se desiderato
-
-### Strumenti tomboliere
-- **Copia numeri estratti**: per condividere facilmente la sequenza
-- **Importazione estratti**: incolla lista di numeri già estratti (con conferma)
-- **Messaggi ai giocatori**: invia comunicazioni testuali ai singoli partecipanti
-- **Slider BN**: definisci i BN per cartella (0-10, step 0.5)
-- **Ripartizione premi**: slider per distribuzione percentuale (somma sempre 100%)
-
-### Aggiornamenti in tempo reale
-- Numeri estratti visibili immediatamente a tutti i giocatori
-- Tabellone e cartelle si aggiornano automaticamente
-- Vincite riconosciute e notificate istantaneamente
-
-## Credits
-Ideato e realizzato da **Vincenzo Di Franco**  
-vincenzo.difranco@gmail.com  
-https://www.linkedin.com/in/vincenzo-di-franco-38216645/
-
----
-
-**Nota**: Questo gioco è puramente ricreativo. I "Babbi Natali (BN)" sono un'unità ludica per conti tra amici/famiglia, senza valore economico.
-Perfetto! Ecco un **riepilogo completo** di tutto il progetto Tombola, aggiornato con tutte le modifiche implementate.
-
----
-
-## 📦 **ELENCO COMPLETO DEL PROGETTO TOMBOLA**
-
-### **🧩 File Principali dell'Applicazione**
-
-#### **Frontend (React - `app/client/`)**:
-- **`src/App.jsx`** - Componente principale con gestione route, socket, popup numero/vincite, toggle popup globale
-- **`src/pages/Home.jsx`** - Pagina iniziale con scelta ruolo + sezione credits (email, LinkedIn, PayPal)
-- **`src/pages/Host.jsx`** - Pannello Tomboliere: creazione sessione, estrazione numeri, gestione giocatori, importazione estratti con conferma, invio messaggi, slider BN
-- **`src/pages/Player.jsx`** - Pannello Giocatore: inserimento cartelle, tabellone, toggle popup, copia numeri
-- **`src/pages/Join.jsx`** - Pagina join con scanner QR code
-- **`src/components/`** - Componenti riutilizzabili (Board, CartellaView, LastNumbers, CardInput)
-- **`src/api.js`** - Configurazione Socket.IO client
-- **`src/styles.css`** - Stili completi con tema natalizio, animazioni fuochi d'artificio, popup
-- **`vite.config.js`** - Configurazione build
-
-#### **Backend (Node.js - `app/server/`)**:
-- **`index.js`** - Server principale Express + Socket.IO, gestione sessioni, eventi realtime, messaggi host→player
-- **`game.js`** - Logica di gioco: estrazione numeri, rilevamento vincite (ambo, terno, quaterna, cinquina, tombola), validazione cartelle, generazione casuale
-- **`package.json`** - Dipendenze (express, socket.io, qrcode)
-
-#### **Infrastruttura & Deployment**:
-- **`docker-compose.yml`** - Servizi: tombola (app), nginx (proxy TLS), certbot (SSL automatico)
-- **`nginx/conf.d/tombola.conf`** - Configurazione nginx con proxy WebSocket
-- **`scripts/init-letsencrypt.sh`** - Script inizializzazione certificati SSL
-- **`bundle_project.sh`** - Script per creare bundle sorgenti
-- **`README.md`** - Documentazione aggiornata con tutte le funzionalità
-
----
-
-## ✅ **FUNZIONALITÀ COMPLETE IMPLEMENTATE**
-
-### **1. Core Gameplay**
-- ✅ Creazione sessione con codice 6 caratteri
-- ✅ Join giocatori via codice/nickname
-- ✅ Inserimento cartelle manuale (3×5 numeri)
-- ✅ Cartelle casuali automatiche (🎲)
-- ✅ Estrazione numeri realtime
-- ✅ Rilevamento automatico vincite: ambo, terno, quaterna, cinquina, tombola
-- ✅ Tabellone 1-90 con numeri estratti evidenziati
-
-### **2. Notifiche & UI Avanzate**
-- ✅ **Popup numeri estratti** (ogni estrazione, 3 secondi)
-- ✅ **Popup vincite speciali**: solo primo ambo/terno/quaterna/cinquina + tutte le tombola
-- ✅ **Toggle globale popup** (🔔/🔕) salvato in localStorage
-- ✅ **Toast** per tutte le vincite
-- ✅ **Fuochi d'artificio** animati per vincite importanti
-- ✅ **Tema natalizio** completo con decorazioni
-
-### **3. Strumenti Tomboliere**
-- ✅ **Slider BN** (0-10, step 0.5) per definire punti/cartella
-- ✅ **Slider ripartizione premi** (somma sempre 100%)
-- ✅ **Importazione estratti** con popup conferma e avviso perdita dati
-- ✅ **Copia numeri estratti** (formato CSV)
-- ✅ **Invio messaggi** a singoli giocatori
-- ✅ **QR code** per join rapido
-- ✅ **Visualizzazione cartelle** di tutti i giocatori (solo host)
-
-### **4. Gestione Punti (BN - Babbi Natali)**
-- ✅ Calcolo automatico montepremi: `cartelle × BN/cartella`
-- ✅ Ripartizione premi con algoritmo "Largest Remainder" per valori interi
-- ✅ Avvisi chiari: BN sono punti fittizi, non denaro
-
-### **5. Credits & Contatti**
-- ✅ **Sezione credits** in Home page
-- ✅ **Link email**: `vincenzo.difranco@gmail.com`
-- ✅ **Link LinkedIn**: profilo completo
-- ✅ **Link PayPal**: "Regalami un caffè" con gradiente blu
-- ✅ Messaggio ringraziamento finale
-
-### **6. Deployment Docker**
-- ✅ Container app Node.js + React build
-- ✅ Nginx con TLS/SSL automatico (Let's Encrypt)
-- ✅ Configurazione WebSocket per Socket.IO
-- ✅ Certificati autorenew ogni 12 ore
-
----
-
-## 🚀 **ISTRUZIONI AVVIO**
-
-```bash
-# 1. Clona/estrai il progetto
-# 2. Genera certificati SSL (prima volta)
+### Produzione (con SSL)
+```
+# Prima volta: genera certificati SSL
 ./scripts/init-letsencrypt.sh
 
-# 3. Avvia tutti i servizi
-docker compose up --build
+# Avvia servizi
+docker compose up -d
 
-# 4. Accedi a:
-#    https://tombola.freeinfo.it (produzione)
-#    http://localhost:8080       (sviluppo)
+# Verifica logs
+docker compose logs -f tombola
 ```
 
-### **📱 Test Funzionalità Chiave**
-
-1. **Creazione sessione** → `/host`
-2. **Join giocatore** → `/join` (scansiona QR o inserisci codice)
-3. **Popup test** → Estrai numero → Verifica popup
-4. **Toggle popup** → Clicca 🔔/🔕 in header
-5. **Importazione** → Host: incolla "5 12 33 45 90" → Conferma
-6. **Messaggi** → Host: seleziona giocatore → "Test ripartire"
-7. **Credits** → Home page → Verifica link funzionanti
+Accedi: https://tombola.freeinfo.it
 
 ---
 
-## 🎯 **Architettura Tecnica**
+## 🎮 Funzionalità Principali
+
+### **Core Gameplay**
+1. **Tomboliere** crea una sessione e condivide il codice (6 caratteri)
+2. **Giocatori** entrano con codice + nickname
+3. Inserimento cartelle **manuale** (3 righe × 5 numeri) o **casuali** (🎲)
+4. **Spunta automatica** numeri estratti su tutte le cartelle
+5. **Rilevamento vincite realtime**: ambo, terno, quaterna, cinquina, tombola
+6. **Notifiche** toast + popup per ogni vincita
+
+---
+
+## 💰 Sistema Punti BN (Babbi Natali)
+
+L'app calcola premi in **"Babbi Natali (BN)"** - punti virtuali, **NON denaro reale**.
+
+- **Montepremi**: `Totale cartelle × BN per cartella`
+- **Ripartizione personalizzabile**: slider % per ogni premio (ambo, terno, ecc.)
+- **Algoritmo "Largest Remainder"**: garantisce somma esatta senza arrotondamenti strani
+
+> ⚠️ **Disclaimer**: Eventuali accordi economici tra partecipanti avvengono **fuori dall'app**.
+
+---
+
+## ⚙️ Strumenti Tomboliere (Host)
+
+### **Gestione Partita**
+- ✅ **Estrazione casuale**: pulsante 🎲 per numero random
+- ✅ **Estrazione manuale**: input 1-90 per forzare numero specifico
+- ✅ **Reset parziale**: azzera numeri ma mantiene cartelle
+- ✅ **Reset totale**: azzera tutto (con conferma)
+- ✅ **Importa partita**: incolla lista numeri estratti (con validazione e conferma)
+- ✅ **Copia numeri**: esporta estratti in formato CSV
+
+### **Gestione Iscrizioni**
+- ✅ **Blocco cartelle**: toggle per chiudere/aprire iscrizioni
+  - 🟢 APERTE: giocatori possono aggiungere cartelle
+  - 🔴 CHIUSE: nessuna nuova cartella accettata
+- ✅ **Elimina cartelle**: rimuovi cartelle di giocatori (con conferma)
+
+### **Gestione Premi**
+- ✅ **Slider BN/cartella**: 0-10, step 0.5
+- ✅ **Ripartizione live**: modifica % premi durante partita
+- ✅ **Blocco slider**: congela premi specifici mentre modifichi altri
+
+### **Comunicazione**
+- ✅ **Messaggi ai giocatori**: invia testo a singoli partecipanti
+- ✅ **QR Code**: condivisione link join con scansione
+- ✅ **Visualizzazione cartelle**: vedi tutte le cartelle dei giocatori in tempo reale
+
+### **🆕 Sistema di Resilienza Connessione**
+- ✅ **Heartbeat automatico**: ping/pong ogni 25s mantiene connessione viva
+- ✅ **Auto-reconnect**: riconnessione automatica se si disconnette
+- ✅ **Indicatore visivo**: badge colorato mostra stato connessione
+  - 🟢 **CONNESSO**: tutto ok
+  - 🟡 **RICONNESSIONE**: tentativo di recupero in corso
+  - 🔴 **DISCONNESSO**: connessione persa
+- ✅ **Refresh manuale**: pulsante "🔄 Aggiorna Stato" per forzare ricaricamento
+- ✅ **Persistenza sessione**: recupera automaticamente la sessione dopo ricarica pagina (fino a 2 ore)
+- ✅ **Pulsanti intelligenti**: disabilitati automaticamente se disconnesso
+
+### **🆕 Log Eventi Live**
+- ✅ **Pannello eventi realtime**: tutti gli eventi visibili all'host
+- ✅ **Filtri per tipo**: draw, win, card_added, settings, error
+- ✅ **Timestamp**: ora esatta di ogni evento
+- ✅ **Dettagli espandibili**: dati JSON per debug
+- ✅ **Ultimi 100 eventi**: auto-cleanup vecchi record
+- ✅ **Eventi tracciati**:
+  - Estrazioni numeri (casuali e manuali)
+  - Cartelle aggiunte/eliminate
+  - Vincite (con dettagli giocatore/cartella)
+  - Cambio impostazioni
+  - Join/leave giocatori
+  - Errori e problemi
+
+---
+
+## 🎉 Funzionalità Player (Giocatore)
+
+### **Gestione Cartelle**
+- ✅ **Inserimento manuale**: griglia 3×5 con validazione
+- ✅ **Cartelle casuali**: genera 15 numeri validi automaticamente
+- ✅ **Elimina cartelle**: rimuovi le tue cartelle (prima di vincite)
+- ✅ **Spunta automatica**: numeri estratti evidenziati in verde
+- ✅ **Badge vincite**: ambo/terno/quaterna/cinquina/tombola visibili su ogni cartella
+
+### **Visualizzazione**
+- ✅ **Tabellone 1-90**: tutti i numeri con evidenziazione estratti
+- ✅ **Ultimi 5 numeri**: sempre visibili in alto
+- ✅ **🆕 Smorfia Napoletana**: ogni numero mostra significato tradizionale con emoji
+  - Es: 48 → "🗣️ Il morto che parla"
+  - Es: 90 → "😱 La paura"
+
+### **Notifiche**
+- ✅ **Popup numero estratto**: appare ad ogni estrazione (3s)
+- ✅ **Popup vincite**: 
+  - Solo **primo** ambo/terno/quaterna/cinquina di tutta la partita
+  - **Tutte** le tombola
+  - Animazione fuochi d'artificio 🎆
+- ✅ **Toast vincite**: notifica permanente per ogni vincita
+- ✅ **Toggle popup globale**: 🔔/🔕 disabilita/abilita popup (salvato in localStorage)
+- ✅ **Messaggi host**: ricevi comunicazioni dal tomboliere
+
+### **Utilità**
+- ✅ **Copia numeri**: esporta estratti facilmente
+- ✅ **Refresh automatico**: aggiornamento realtime senza ricaricare
+
+---
+
+## 🔧 Architettura Tecnica
 
 ```
-┌─────────────────────────────────────────────┐
-│              Browser (Client)               │
-│  React + Vite + Socket.IO-client            │
-└─────────────────┬───────────────────────────┘
-                  │ HTTPS/WSS
-┌─────────────────▼───────────────────────────┐
-│              Nginx (Proxy)                  │
-│  TLS termination + WebSocket proxy          │
-└─────────────────┬───────────────────────────┘
-                  │ HTTP/WS (internal)
-┌─────────────────▼───────────────────────────┐
-│        Node.js Server (Express)             │
-│  Session management + Game logic + QR gen   │
-└─────────────────┬───────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────┐
-│          Redis/Session Storage              │
-│  (In-memory nel codice attuale)             │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│         Browser Client (React)               │
+│  -  Vite build ottimizzata                    │
+│  -  Socket.IO client con auto-reconnect       │
+│  -  LocalStorage per persistenza              │
+└────────────────┬─────────────────────────────┘
+                 │ HTTPS/WSS
+┌────────────────▼─────────────────────────────┐
+│         Nginx Reverse Proxy                  │
+│  -  TLS/SSL termination (Let's Encrypt)       │
+│  -  WebSocket proxy                           │
+│  -  Gzip compression                          │
+└────────────────┬─────────────────────────────┘
+                 │ HTTP/WS (interno)
+┌────────────────▼─────────────────────────────┐
+│      Node.js Server (Express)                │
+│  -  Socket.IO server con heartbeat            │
+│  -  Session management in-memory              │
+│  -  Game logic (game.js)                      │
+│  -  QR code generation                        │
+│  -  Event logging system                      │
+└──────────────────────────────────────────────┘
+```
+
+### **Stack Tecnologico**
+- **Frontend**: React 18, Vite, Socket.IO-client
+- **Backend**: Node.js 20, Express, Socket.IO
+- **Infrastruttura**: Docker, Nginx, Let's Encrypt
+- **Persistenza**: In-memory (session recovery via localStorage client-side)
+
+---
+
+## 📱 Test Funzionalità
+
+### **Scenario Base**
+```
+# 1. Host crea sessione
+Vai su /host → Imposta BN e ripartizione → "Crea sessione"
+
+# 2. Player si unisce
+Scansiona QR o vai su /join → Inserisci codice
+
+# 3. Aggiungi cartelle
+Player: inserisci numeri manualmente o usa 🎲
+
+# 4. Chiudi iscrizioni
+Host: clicca "⛔ Chiudi Iscrizioni"
+
+# 5. Estrai numeri
+Host: usa "🎲 Estrai Casuale" o inserisci numero manuale
+
+# 6. Verifica vincite
+Player: vedi popup + toast + badge su cartella
+Host: vedi log eventi con dettagli
+```
+
+### **Test Resilienza**
+```
+# Simula disconnessione
+1. Host estrae alcuni numeri
+2. Spegni WiFi per 1 minuto
+3. Riaccendi → badge diventa 🟡 poi 🟢
+4. Clicca "🔄 Aggiorna Stato"
+5. Verifica che numeri estratti siano sincronizzati
+```
+
+### **Test Import/Export**
+```
+# Export numeri
+Host: clicca "📋 Copia Estratti"
+Ctrl+V in un file → vedi "5, 12, 33, 45, 90"
+
+# Import numeri
+Host: incolla "1 2 3 10 20 30" → "✅ Imposta estratti"
+Conferma → Verifica tabellone aggiornato
 ```
 
 ---
 
-## 📝 **Note Finali**
+## 🐛 Troubleshooting
 
-Il progetto è **completo e pronto per produzione** con:
+### **Problema: Disconnessioni frequenti dopo 15 minuti**
+**Soluzione**: Implementato heartbeat automatico (ping ogni 25s) + auto-reconnect
 
-1. **🔒 Sicurezza**: TLS/SSL, validazione input, sanitizzazione dati
-2. **📱 Responsive**: Adatta a mobile/desktop
-3. **⚡ Performance**: Build Vite ottimizzata, WebSocket per aggiornamenti realtime
-4. **🎨 UX/UI**: Tema coerente, feedback visivi chiari, animazioni non intrusive
-5. **🛠️ Manutenibilità**: Codice modulare, struttura chiara, documentazione
+### **Problema: Non posso estrarre dopo ricarica pagina**
+**Soluzione**: Usa pulsante "🔄 Aggiorna Stato" o clicca sul badge connessione
 
-**Crediti finali**: Ideato e realizzato da **Vincenzo Di Franco**  
-📧 vincenzo.difranco@gmail.com | 💼 LinkedIn | ☕ PayPal
+### **Problema: Popup troppo invasivi**
+**Soluzione**: Clicca 🔔 → 🔕 nell'header per disabilitare
 
-**Buon divertimento con la Tombola Natalizia!** 🎄✨
+### **Problema: Certificati SSL scaduti**
+```
+# Rinnova manualmente
+docker compose run --rm certbot renew
+
+# Riavvia nginx
+docker compose restart nginx
+```
+
+### **Problema: Porta 80/443 già in uso**
+```
+# Trova processo
+sudo lsof -i :80
+sudo lsof -i :443
+
+# Stoppa servizio
+sudo systemctl stop apache2  # o nginx
+
+# Riavvia tombola
+docker compose up -d
+```
+
+---
+
+## 📦 Struttura Progetto
+
+```
+tombola/
+├── app/
+│   ├── client/              # React frontend
+│   │   ├── src/
+│   │   │   ├── pages/       # Host, Player, Join, Home
+│   │   │   ├── components/  # Board, CartellaView, etc.
+│   │   │   ├── App.jsx      # Main component con socket
+│   │   │   └── styles.css   # Tema natalizio + animazioni
+│   │   └── vite.config.js
+│   ├── server/              # Node.js backend
+│   │   ├── index.js         # Express + Socket.IO + logging
+│   │   ├── game.js          # Logica tombola
+│   │   └── package.json
+│   └── Dockerfile
+├── nginx/
+│   └── conf.d/tombola.conf  # Proxy config con WebSocket
+├── certbot/                 # Certificati SSL
+├── scripts/
+│   └── init-letsencrypt.sh  # Setup SSL automatico
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## 🎯 Roadmap Future (Possibili Estensioni)
+
+- [ ] **Persistenza Redis**: salvare sessioni su database
+- [ ] **Replay partite**: rivedere partite passate
+- [ ] **Statistiche**: vincite per giocatore, numeri più estratti
+- [ ] **Tema personalizzabile**: switch dark/light mode
+- [ ] **Audio**: suoni per estrazioni e vincite
+- [ ] **Multiplayer lobbies**: multiple sessioni contemporanee gestite
+- [ ] **OCR cartelle**: carica cartella da foto (sperimentale)
+
+---
+
+## 👨‍💻 Credits & Contatti
+
+**Ideato e realizzato da**: Vincenzo Di Franco
+
+📧 Email: [vincenzo.difranco@gmail.com](mailto:vincenzo.difranco@gmail.com)  
+💼 LinkedIn: [Vincenzo Di Franco](https://www.linkedin.com/in/vincenzo-di-franco-38216645/)  
+☕ PayPal: [Regalami un caffè](https://www.paypal.com/paypalme/vincenzodifranco)
+
+---
+
+## 📄 Licenza
+
+Progetto ricreativo per uso personale e familiare.  
+I "Babbi Natali (BN)" sono un'unità ludica senza valore economico reale.
+
+**Disclaimer**: Questo software è fornito "as-is" senza garanzie.  
+L'autore non è responsabile per eventuali problemi derivanti dall'uso.
+
+---
+
+## 🎄 Buon Divertimento!
+
+**Tombola Natalizia** - Gioca responsabilmente con amici e famiglia! 🎅✨
+
+---
+
+_Ultimo aggiornamento: 25 Dicembre 2025_
+```
+
+***
+
+Vuoi che aggiunga anche:
+1. **CHANGELOG.md** con tutte le modifiche per versione?
+2. **CONTRIBUTING.md** per eventuali collaboratori?
+3. **API.md** con documentazione Socket.IO events?
+
+[1](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/33947840/ce8960b8-7e24-429c-85f5-7738976bbed5/paste.txt)
+[2](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/33947840/758c261f-899b-4e1d-b604-489dddd37cbd/paste.txt)
+[3](https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/33947840/1dd4a3ad-e532-4331-85d1-7f962f445e17/paste.txt)

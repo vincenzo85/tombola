@@ -66,9 +66,11 @@ const io = new Server(server, {
     credentials: true
   },
   connectionStateRecovery: {
-    maxDisconnectionDuration: 2 * 60 * 1000,
+    maxDisconnectionDuration: 20 * 60 * 1000, // 20 minuti
     skipMiddlewares: true
-  }
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 const rateLimit = new Map();

@@ -124,7 +124,7 @@ function parseDrawnInput(text) {
   return out;
 }
 
-// ✅ COMPONENTE EVENT LOG
+// COMPONENTE EVENT LOG
 function EventLog({ events = [] }) {
   const [expanded, setExpanded] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -265,7 +265,7 @@ function EventLog({ events = [] }) {
 }
 
 export default function Host({ socket, onToast }) {
-  // Stati
+  // Stati esistenti
   const [hostName, setHostName] = useState("Tomboliere");
   const [newCardsAllowed, setNewCardsAllowed] = useState(false);
   const [code, setCode] = useState(null);
@@ -288,7 +288,11 @@ export default function Host({ socket, onToast }) {
   const [importError, setImportError] = useState("");
   const [manualNumber, setManualNumber] = useState("");
 
-  // Socket listeners
+  // ✅ NUOVI STATI per connessione
+  const [connectionState, setConnectionState] = useState("connected");
+  const [lastPing, setLastPing] = useState(Date.now());
+
+  // Socket listeners esistenti
   useEffect(() => {
     const onUpdate = (s) => setSession(s);
     socket.on("session:update", onUpdate);
@@ -310,7 +314,103 @@ export default function Host({ socket, onToast }) {
     }
   }, [session?.settings]);
 
-  // Funzioni
+  // ✅ MONITORAGGIO CONNESSIONE
+  useEffect(() => {
+    const onConnect = () => {
+      console.log("[HOST] Socket connected");
+      setConnectionState("connected");
+      setLastPing(Date.now());
+      
+      if (code) {
+        socket.emit("session:get", { code }, (res) => {
+          if (res?.ok) {
+            setSession(res.session);
+            onToast?.("✅ Connessione ripristinata!");
+          }
+        });
+      }
+    };
+
+    const onDisconnect = (reason) => {
+      console.log("[HOST] Socket disconnected:", reason);
+      setConnectionState("disconnected");
+      onToast?.("⚠️ Connessione persa. Tentativo di riconnessione...");
+    };
+
+    const onReconnecting = (attemptNumber) => {
+      console.log("[HOST] Reconnecting attempt:", attemptNumber);
+      setConnectionState("reconnecting");
+    };
+
+    const onPing = () => {
+      setLastPing(Date.now());
+      socket.emit("pong");
+    };
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.io.on("reconnect_attempt", onReconnecting);
+    socket.on("ping", onPing);
+
+    const checkInterval = setInterval(() => {
+      const timeSinceLastPing = Date.now() - lastPing;
+      
+      if (timeSinceLastPing > 60000 && socket.connected) {
+        console.warn("[HOST] No ping for 60s, connection might be stale");
+        setConnectionState("reconnecting");
+        socket.disconnect();
+        socket.connect();
+      }
+    }, 30000);
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.io.off("reconnect_attempt", onReconnecting);
+      socket.off("ping", onPing);
+      clearInterval(checkInterval);
+    };
+  }, [socket, code, lastPing, onToast]);
+
+  // ✅ PERSISTENZA SESSIONE
+  useEffect(() => {
+    if (code && session) {
+      localStorage.setItem('tombola_host_code', code);
+      localStorage.setItem('tombola_host_session', JSON.stringify({
+        code,
+        timestamp: Date.now()
+      }));
+    }
+  }, [code, session]);
+
+  useEffect(() => {
+    const savedCode = localStorage.getItem('tombola_host_code');
+    const savedSession = localStorage.getItem('tombola_host_session');
+    
+    if (savedCode && savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        const age = Date.now() - parsed.timestamp;
+        
+        if (age < 2 * 60 * 60 * 1000) {
+          socket.emit("session:get", { code: savedCode }, (res) => {
+            if (res?.ok) {
+              setCode(savedCode);
+              setSession(res.session);
+              onToast?.("✅ Sessione precedente recuperata!");
+            } else {
+              localStorage.removeItem('tombola_host_code');
+              localStorage.removeItem('tombola_host_session');
+            }
+          });
+        }
+      } catch (e) {
+        console.error("Error recovering session:", e);
+      }
+    }
+  }, [socket, onToast]);
+
+  // Funzioni esistenti
   const saveSplitsToServer = (nextSplits) => {
     socket.emit("host:updateSettings", { settings: { splits: nextSplits } }, (res) => {
       if (!res?.ok) onToast?.(res?.error || "Errore salvataggio ripartizione");
@@ -438,6 +538,29 @@ export default function Host({ socket, onToast }) {
     });
   };
 
+  // ✅ REFRESH MANUALE
+  const manualRefresh = () => {
+    if (!code) return;
+    
+    setConnectionState("reconnecting");
+    
+    socket.disconnect();
+    socket.connect();
+    
+    setTimeout(() => {
+      socket.emit("session:get", { code }, (res) => {
+        if (res?.ok) {
+          setSession(res.session);
+          setConnectionState("connected");
+          onToast?.("✅ Stato aggiornato!");
+        } else {
+          setConnectionState("disconnected");
+          onToast?.("❌ Errore ricaricamento stato");
+        }
+      });
+    }, 1000);
+  };
+
   // Calcoli UI
   const joinUrl = useMemo(() => {
     const c = session?.code || code;
@@ -462,7 +585,6 @@ export default function Host({ socket, onToast }) {
     <div className="card">
       <h2 style={{ marginTop: 0 }}>Tomboliere</h2>
 
-      {/* Creazione sessione */}
       {!code && (
         <>
           <div className="row">
@@ -502,7 +624,6 @@ export default function Host({ socket, onToast }) {
         </>
       )}
 
-      {/* Partita live */}
       {code && (
         <>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
@@ -515,10 +636,29 @@ export default function Host({ socket, onToast }) {
             <span className={"badge " + (newCardsAllowed ? "pill-green" : "pill-red")}>
               {newCardsAllowed ? "ISCRIZIONI APERTE" : "ISCRIZIONI CHIUSE"}
             </span>
+            
+            <span 
+              className={"badge " + (
+                connectionState === "connected" ? "pill-green" : 
+                connectionState === "reconnecting" ? "pill-gold" : 
+                "pill-red"
+              )}
+              style={{ cursor: "pointer" }}
+              onClick={manualRefresh}
+              title="Clicca per aggiornare"
+            >
+              {connectionState === "connected" ? "🟢 CONNESSO" : 
+               connectionState === "reconnecting" ? "🟡 RICONNESSIONE..." : 
+               "🔴 DISCONNESSO"}
+            </span>
           </div>
 
           <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-            <button className="btn btn-primary" onClick={draw} disabled={session?.state?.ended}>
+            <button 
+              className="btn btn-primary" 
+              onClick={draw} 
+              disabled={session?.state?.ended || connectionState !== "connected"}
+            >
               🎲 Estrai Casuale
             </button>
             
@@ -536,7 +676,7 @@ export default function Host({ socket, onToast }) {
               <button 
                 className="btn" 
                 onClick={drawManual}
-                disabled={!manualNumber || session?.state?.ended}
+                disabled={!manualNumber || session?.state?.ended || connectionState !== "connected"}
               >
                 ✍️ Estrai Manuale
               </button>
@@ -544,13 +684,29 @@ export default function Host({ socket, onToast }) {
 
             <button 
               className="btn" 
+              onClick={manualRefresh}
+              style={{
+                background: "rgba(59,130,246,0.2)",
+                color: "#3b82f6",
+                borderColor: "#3b82f6"
+              }}
+              disabled={connectionState === "reconnecting"}
+            >
+              🔄 Aggiorna Stato
+            </button>
+
+            <button 
+              className="btn" 
               onClick={resetPartial}
               style={{ background: "rgba(245,158,11,0.2)", borderColor: "rgba(245,158,11,0.5)" }}
+              disabled={connectionState !== "connected"}
             >
               🔄 Reset Parziale
             </button>
 
-            <button className="btn" onClick={() => toggleNewCards()} style={{
+            <button className="btn" onClick={() => toggleNewCards()} 
+              disabled={connectionState !== "connected"}
+              style={{
                 background: newCardsAllowed ? "rgba(239,68,68,0.2)" : "rgba(34,197,94,0.2)",
                 color: newCardsAllowed ? "#ef4444" : "#22c55e",
                 borderColor: newCardsAllowed ? "#ef4444" : "#22c55e"
@@ -558,10 +714,11 @@ export default function Host({ socket, onToast }) {
               {newCardsAllowed ? "⛔ Chiudi Iscrizioni" : "✅ Apri Iscrizioni"}
             </button>
             <button className="btn" onClick={copyDrawnNumbers}>📋 Copia Estratti</button>
-            <button className="btn" onClick={() => setShowMessageModal(true)}>💬 Invia Messaggio</button>
+            <button className="btn" onClick={() => setShowMessageModal(true)} disabled={connectionState !== "connected"}>💬 Invia Messaggio</button>
             <button 
               className="btn" 
               onClick={() => setShowResetConfirm(true)}
+              disabled={connectionState !== "connected"}
               style={{
                 background: "rgba(239,68,68,0.2)",
                 color: "#ef4444",
@@ -572,7 +729,6 @@ export default function Host({ socket, onToast }) {
             </button>
           </div>
 
-          {/* ✅ LOG EVENTI - POSIZIONATO SUBITO DOPO I CONTROLLI */}
           <div style={{ marginTop: 12 }}>
             <EventLog events={hostView?.eventLog || []} />
           </div>
@@ -683,6 +839,7 @@ export default function Host({ socket, onToast }) {
                 className="btn btn-primary" 
                 style={{ marginTop: 10 }} 
                 onClick={handleImportClick}
+                disabled={connectionState !== "connected"}
               >
                 ✅ Imposta estratti
               </button>
@@ -761,7 +918,6 @@ export default function Host({ socket, onToast }) {
         </>
       )}
 
-      {/* Modals */}
       {showMessageModal && (
         <div className="modal-backdrop" onClick={() => setShowMessageModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
