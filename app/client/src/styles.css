@@ -630,3 +630,46 @@ select.input {
   overflow-y: auto;
   /* mantieni gli altri stili esistenti del modal */
 }
+/* Cartella - numeri cliccabili in modalità manuale */
+.tombola-cartella__cell.is-clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tombola-cartella__cell.is-clickable:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(75,107,255,0.5);
+}
+
+/* Numeri marcati solo manualmente (non estratti) */
+.tombola-cartella__cell.is-manual-only {
+  background: rgba(245,158,11,0.3) !important;
+  border-color: rgba(245,158,11,0.7) !important;
+  position: relative;
+}
+
+.tombola-cartella__cell.is-manual-only::after {
+  content: "✋";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+/* Numero estratto ma non marcato in modalità manuale */
+.tombola-cartella__cell.is-drawn-not-marked {
+  border-color: rgba(245,158,11,0.9) !important;
+  border-width: 2px;
+  border-style: dashed;
+  background: rgba(245,158,11,0.05) !important;
+}
+
+.tombola-cartella__cell.is-drawn-not-marked::after {
+  content: "↓";
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 10px;
+  color: rgba(245,158,11,1);
+  opacity: 0.8;
+}
